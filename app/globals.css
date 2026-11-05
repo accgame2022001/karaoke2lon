@@ -61,3 +61,6 @@ body[data-t=forest]{--bg:#08140d;--panel:#10241a;--line:#245038;--hot:#4ade80;--
 .sc.me small{color:var(--on);font-weight:700}
 .duo{display:flex;gap:1.6rem;align-items:flex-end}
 .star{background:transparent;color:var(--hot);padding:.2rem .5rem;font-size:1.15rem}
+.row{display:flex;gap:.5rem;align-items:center;margin:.35rem 0}
+.row input[type=range]{flex:1}
+.sec small{display:block;color:var(--dim);margin-top:.3rem}
