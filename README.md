@@ -7,6 +7,12 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - **Giọng hát:** truyền qua LiveKit (WebRTC). Chỉ người đến lượt được cấp quyền publish; người nghe không bao giờ xin quyền mic.
 - **Hàng chờ và bài đang hát:** lưu trong metadata phòng LiveKit, nên không cần database.
 
+## Phòng, ghế và chat
+- 4 phòng có sẵn, mỗi phòng một giao diện: Hoàng Gia (tím vàng), VIP 1 (đỏ neon), VIP 2 (xanh đại dương), VIP 3 (xanh rừng). Cũng có thể nhập mã phòng riêng.
+- Mỗi phòng tối đa 30 ghế. Mọi người ngồi theo thứ tự vào phòng, người đang hát đứng trên sân khấu.
+- Chat hiện thành bong bóng trên đầu người gửi trong 6 giây, kèm danh sách tin nhắn gần đây.
+- Gõ tên bài vào ô Chọn bài để tìm karaoke. Cần `YOUTUBE_API_KEY`; hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày, kết quả được lưu 1 ngày để tiết kiệm.
+
 ## Chấm điểm và bảng xếp hạng
 - Hát xong, mọi người (trừ người hát) có 10 giây chấm từ 1 đến 10. Bấm Bỏ qua bài thì không chấm.
 - Điểm bài = trung bình các phiếu. Bảng xếp hạng cộng điểm các bài đã hát theo tên người hát, kèm điểm trung bình.
