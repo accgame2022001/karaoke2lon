@@ -1,18 +1,18 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, LocalAudioTrack } from "livekit-client";
-import { startVoice, unlockAudio } from "../lib/voice";
+import { startVoice, unlockAudio, getCtx } from "../lib/voice";
 
 const api = (p, body) =>
   fetch(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
-const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false, gate: false, gain: 3 };
+const FX0 = { filter: true, reverb: 40, echo: 20, monitor: true, ear: true, gate: false, gain: 3 };
 const PRESETS = [
-  { n: "Tiệm karaoke", reverb: 55, echo: 30 },
-  { n: "Phòng thu", reverb: 25, echo: 8 },
-  { n: "Hội trường", reverb: 80, echo: 15 },
+  { n: "Rõ lời", reverb: 12, echo: 0 },
+  { n: "Tiệm karaoke", reverb: 40, echo: 20 },
+  { n: "Hội trường", reverb: 70, echo: 10 },
 ];
 const ROOMS = [
   { id: "hoang-gia", name: "Phòng Hoàng Gia", sub: "Tím vàng sang trọng", t: "royal" },
@@ -117,13 +117,13 @@ function Karaoke({ name, room }) {
   const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
   // Lọc tiếng và nghe lại giọng mình: mặc định bật, nhớ lựa chọn trên máy này
   const [fx, setFx] = useState(() => {
-    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx2")) }; } catch { return FX0; }
+    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx3")) }; } catch { return FX0; }
   });
   const fxRef = useRef(fx);
   fxRef.current = fx;
   useEffect(() => {
     voice.current?.set(fx);
-    try { localStorage.setItem("kfx2", JSON.stringify(fx)); } catch {}
+    try { localStorage.setItem("kfx3", JSON.stringify(fx)); } catch {}
   }, [fx]);
   const toggleSave = (vid, title) => setSaved((s) => {
     const n = s.some((x) => x.vid === vid) ? s.filter((x) => x.vid !== vid) : [{ vid, title }, ...s].slice(0, 50);
@@ -137,7 +137,29 @@ function Karaoke({ name, room }) {
     clearTimeout(timers.current[idn]);
     timers.current[idn] = setTimeout(() => setBub((b) => { const x = { ...b }; delete x[idn]; return x; }), 6000);
   };
-  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1), peopleRef = useRef([]), gone = useRef(0), voice = useRef(null), starting = useRef(false);
+  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1), peopleRef = useRef([]), gone = useRef(0), voice = useRef(null), starting = useRef(false), remote = useRef(new Map());
+  // Âm lượng giọng người hát: đến 100% dùng loa thường, trên 100% khuếch đại bằng Web Audio
+  const applyVol = (e) => {
+    const v = voiceVol.current;
+    if (v <= 1) {
+      e.el.muted = false;
+      e.el.volume = v;
+      if (e.g) e.g.gain.value = 0;
+    } else {
+      if (!e.g) {
+        const c = getCtx();
+        e.s = c.createMediaStreamSource(new MediaStream([e.t.mediaStreamTrack]));
+        e.g = c.createGain();
+        e.s.connect(e.g).connect(c.destination);
+      }
+      e.el.muted = true; // vẫn giữ phần tử để trình duyệt tiếp tục nhận luồng
+      e.g.gain.value = v;
+    }
+  };
+  const setVoiceVol = (v) => {
+    voiceVol.current = v;
+    for (const e of remote.current.values()) applyVol(e);
+  };
   const stRef = useRef(st);
   stRef.current = st;
   peopleRef.current = people;
@@ -175,11 +197,18 @@ function Karaoke({ name, room }) {
       .on(RoomEvent.TrackSubscribed, (t) => {
         if (t.kind !== Track.Kind.Audio) return;
         const el = t.attach();
-        el.volume = voiceVol.current;
         el.dataset.voice = "1";
         document.body.append(el);
+        const e = { t, el };
+        remote.current.set(t.sid, e);
+        applyVol(e);
       })
-      .on(RoomEvent.TrackUnsubscribed, (t) => t.detach().forEach((e) => e.remove()));
+      .on(RoomEvent.TrackUnsubscribed, (t) => {
+        t.detach().forEach((e) => e.remove());
+        const e = remote.current.get(t.sid);
+        try { e?.s?.disconnect(); e?.g?.disconnect(); } catch {}
+        remote.current.delete(t.sid);
+      });
     (async () => {
       const d = await api("/api/token", { room, identity: id, name });
       if (dead) return;
@@ -264,7 +293,7 @@ function Karaoke({ name, room }) {
         width: "100%", height: "100%",
         playerVars: { controls: 0, playsinline: 1, rel: 0, disablekb: 1, fs: 0 },
         events: {
-          onReady: () => { yt.current.setVolume(80); play(); },
+          onReady: () => { yt.current.setVolume(50); play(); },
           onStateChange: (e) => e.data === 0 && next(),
           onError: () => next(true),
         },
@@ -408,7 +437,7 @@ function Karaoke({ name, room }) {
           <label className="row"><input type="checkbox" checked={fx.gate} onChange={(e) => setFx({ ...fx, gate: e.target.checked })} /> Giảm ồn nền (có thể làm nhỏ tiếng khi hát khẽ)</label>
           <label className="row"><input type="checkbox" checked={fx.ear} onChange={(e) => setFx({ ...fx, ear: e.target.checked })} /> Tôi đang đeo tai nghe (giọng tự nhiên hơn)</label>
           <label className="row"><input type="checkbox" checked={fx.monitor} onChange={(e) => setFx({ ...fx, monitor: e.target.checked })} /> Nghe lại giọng mình</label>
-          <small>Đeo tai nghe có dây rồi bật hai ô trên để có giọng hay nhất. Hát bằng loa ngoài thì để tắt ô tai nghe và tắt nghe lại, nếu không sẽ bị hú.</small>
+          <small>Mặc định giả định bạn đeo tai nghe. Hát bằng loa ngoài thì bỏ tick "đeo tai nghe" và tắt "nghe lại", nếu không sẽ bị hú. Hát nhanh thì chọn kiểu "Rõ lời".</small>
         </section>
       )}
       {singing && (st.ask || []).length > 0 && (
@@ -478,11 +507,9 @@ function Karaoke({ name, room }) {
       )}
       <div className="ctl">
         <button onClick={() => { yt.current?.playVideo(); lk.current?.startAudio(); }}>Bật nhạc</button>
-        <label>Nhạc <input type="range" min="0" max="100" defaultValue="80" onChange={(e) => yt.current?.setVolume(+e.target.value)} /></label>
-        <label>Giọng hát <input type="range" min="0" max="100" defaultValue="100" onChange={(e) => {
-          voiceVol.current = e.target.value / 100;
-          document.querySelectorAll("audio[data-voice]").forEach((a) => (a.volume = voiceVol.current));
-        }} /></label>
+        <label>Nhạc <input type="range" min="0" max="100" defaultValue="50" onChange={(e) => yt.current?.setVolume(+e.target.value)} /></label>
+        <label>Giọng hát <input type="range" min="0" max="300" defaultValue="100" onChange={(e) => setVoiceVol(e.target.value / 100)} /></label>
+        <small style={{ flexBasis: "100%" }}>Nghe giọng hát nhỏ? Hạ thanh Nhạc xuống, kéo thanh Giọng hát lên trên giữa (100%).</small>
       </div>
       <section className="sec">
         <h3>Chọn bài {busy && <small>đang tìm…</small>}</h3>
