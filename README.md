@@ -22,6 +22,7 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Giọng người hát đi qua chuỗi xử lý kiểu dàn karaoke: cổng lọc ồn, cắt tiếng ù, EQ (ấm, bớt đục, rõ lời, sáng), nén, vang hội trường, echo, chorus và giới hạn đỉnh.
 - Có 3 kiểu nhanh: Tiệm karaoke, Phòng thu, Hội trường. Vang và echo chỉnh được từ 0 đến 100%.
 - Khi hát có thanh đo mức tiếng và thanh Độ nhạy mic (mặc định x3). Thanh đo không nhảy nghĩa là mic chưa nhận được tiếng.
+- Mic tự cân mức: giữ giọng ở mức vừa phải, hạ nhanh khi sắp vỡ tiếng. Thanh Mic tối đa là mức khuếch đại cao nhất cho phép.
 - Kiểu Rõ lời, Tiệm karaoke, Hội trường: vang và echo càng nhiều thì lời càng dễ bị nhòe, bài hát nhanh nên dùng Rõ lời.
 - Người nghe có thể kéo thanh Giọng hát đến 300% nếu nghe nhỏ; trên 100% âm thanh đi qua Web Audio.
 - Giảm ồn nền là cổng mềm, mặc định tắt; khi bật chỉ hạ tiếng ồn khi không hát, không cắt hẳn.

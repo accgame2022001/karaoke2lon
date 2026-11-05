@@ -8,11 +8,12 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
-const FX0 = { filter: true, reverb: 40, echo: 20, monitor: true, ear: true, gate: false, gain: 3 };
+const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: true, gate: true, gain: 6 };
 const PRESETS = [
-  { n: "Rõ lời", reverb: 12, echo: 0 },
-  { n: "Tiệm karaoke", reverb: 40, echo: 20 },
-  { n: "Hội trường", reverb: 70, echo: 10 },
+  { n: "Rõ lời", reverb: 10, echo: 0 },
+  { n: "Ca sĩ", reverb: 28, echo: 14 },
+  { n: "Tiệm karaoke", reverb: 45, echo: 25 },
+  { n: "Hội trường", reverb: 65, echo: 8 },
 ];
 const ROOMS = [
   { id: "hoang-gia", name: "Phòng Hoàng Gia", sub: "Tím vàng sang trọng", t: "royal" },
@@ -117,13 +118,13 @@ function Karaoke({ name, room }) {
   const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
   // Lọc tiếng và nghe lại giọng mình: mặc định bật, nhớ lựa chọn trên máy này
   const [fx, setFx] = useState(() => {
-    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx3")) }; } catch { return FX0; }
+    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx4")) }; } catch { return FX0; }
   });
   const fxRef = useRef(fx);
   fxRef.current = fx;
   useEffect(() => {
     voice.current?.set(fx);
-    try { localStorage.setItem("kfx3", JSON.stringify(fx)); } catch {}
+    try { localStorage.setItem("kfx4", JSON.stringify(fx)); } catch {}
   }, [fx]);
   const toggleSave = (vid, title) => setSaved((s) => {
     const n = s.some((x) => x.vid === vid) ? s.filter((x) => x.vid !== vid) : [{ vid, title }, ...s].slice(0, 50);
@@ -255,7 +256,7 @@ function Karaoke({ name, room }) {
         if (!micRef.current) return v.stop();
         voice.current = v;
         await r.localParticipant.publishTrack(new LocalAudioTrack(v.track, undefined, true), {
-          source: Track.Source.Microphone, name: "mic", dtx: false, audioPreset: { maxBitrate: 64000 },
+          source: Track.Source.Microphone, name: "mic", dtx: false, audioPreset: { maxBitrate: 96000 },
         });
       } catch (e) {
         await stopMic();
@@ -425,7 +426,7 @@ function Karaoke({ name, room }) {
           <h3>Giọng hát của bạn</h3>
           <div className="meter"><i ref={meterRef} /></div>
           {quiet && <small className="err">Mic đang rất nhỏ hoặc chưa có tiếng. Nếu bạn đang hát mà thanh trên không nhảy, hãy tăng Độ nhạy mic và kiểm tra quyền mic của trình duyệt.</small>}
-          <label className="row">Độ nhạy mic <input type="range" min="1" max="10" step="0.5" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
+          <label className="row">Mic tối đa <input type="range" min="1" max="10" step="0.5" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
           <div className="presets">
             {PRESETS.map((p) => (
               <button key={p.n} className={fx.filter && fx.reverb === p.reverb && fx.echo === p.echo ? "" : "alt"} onClick={() => setFx({ ...fx, filter: true, reverb: p.reverb, echo: p.echo })}>{p.n}</button>
