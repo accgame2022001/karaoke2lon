@@ -8,7 +8,7 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
-const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false, gate: false };
+const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false, gate: false, gain: 3 };
 const PRESETS = [
   { n: "Tiệm karaoke", reverb: 55, echo: 30 },
   { n: "Phòng thu", reverb: 25, echo: 8 },
@@ -240,6 +240,22 @@ function Karaoke({ name, room }) {
     return () => { stop = true; };
   }, [mic, fx.ear, cur?.t0, people.length]);
 
+  // Thanh đo mức tiếng của mic để người hát biết mic có nhận được giọng hay không
+  const meterRef = useRef(null);
+  const [quiet, setQuiet] = useState(false);
+  useEffect(() => {
+    if (!mic) { setQuiet(false); return; }
+    let low = 0;
+    const iv = setInterval(() => {
+      const l = voice.current?.level() ?? 0;
+      if (meterRef.current) meterRef.current.style.width = Math.min(100, l * 160) + "%";
+      if (!voice.current) return;
+      low = l < 0.02 ? low + 1 : 0;
+      setQuiet(low > 65); // khoảng 8 giây liên tục không có tiếng
+    }, 120);
+    return () => clearInterval(iv);
+  }, [mic]);
+
   // 3) Phát YouTube đồng bộ theo mốc thời gian t0 của máy chủ
   useEffect(() => {
     loadYT().then(() => {
@@ -378,6 +394,9 @@ function Karaoke({ name, room }) {
       {mic && (
         <section className="sec">
           <h3>Giọng hát của bạn</h3>
+          <div className="meter"><i ref={meterRef} /></div>
+          {quiet && <small className="err">Mic đang rất nhỏ hoặc chưa có tiếng. Nếu bạn đang hát mà thanh trên không nhảy, hãy tăng Độ nhạy mic và kiểm tra quyền mic của trình duyệt.</small>}
+          <label className="row">Độ nhạy mic <input type="range" min="1" max="10" step="0.5" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
           <div className="presets">
             {PRESETS.map((p) => (
               <button key={p.n} className={fx.filter && fx.reverb === p.reverb && fx.echo === p.echo ? "" : "alt"} onClick={() => setFx({ ...fx, filter: true, reverb: p.reverb, echo: p.echo })}>{p.n}</button>

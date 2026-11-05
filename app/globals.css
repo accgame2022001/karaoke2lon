@@ -66,3 +66,5 @@ body[data-t=forest]{--bg:#08140d;--panel:#10241a;--line:#245038;--hot:#4ade80;--
 .sec small{display:block;color:var(--dim);margin-top:.3rem}
 button.alt{background:transparent;color:var(--hot);border:1px solid var(--hot)}
 .presets{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem}
+.meter{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:.5rem}
+.meter i{display:block;height:100%;width:0;background:var(--on);transition:width .1s}
