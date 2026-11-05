@@ -100,9 +100,10 @@ function Karaoke({ name, room }) {
     clearTimeout(timers.current[idn]);
     timers.current[idn] = setTimeout(() => setBub((b) => { const x = { ...b }; delete x[idn]; return x; }), 6000);
   };
-  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1);
+  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1), peopleRef = useRef([]), gone = useRef(0);
   const stRef = useRef(st);
   stRef.current = st;
+  peopleRef.current = people;
   const cur = st.cur;
   const singing = cur?.by === id;
 
@@ -195,9 +196,16 @@ function Karaoke({ name, room }) {
     });
     const tick = setInterval(() => {
       const p = yt.current, c = stRef.current.cur;
+      // Người hát đã thoát hơn 5 giây thì bỏ qua bài (không chấm điểm)
+      if (c && lk.current?.state === "connected" && peopleRef.current.length && !peopleRef.current.some((x) => x.id === c.by)) {
+        gone.current ||= Date.now();
+        if (Date.now() - gone.current > 5000) next(true);
+      } else gone.current = 0;
       if (!p?.getPlayerState || !c) return;
       const want = (Date.now() + off.current - c.t0) / 1000;
       if (want < 0) return;
+      const dur = p.getDuration?.();
+      if (dur > 0 && want > dur + 3) return next(); // phòng khi sự kiện hết bài không tới
       const s = p.getPlayerState();
       if (s === 2) p.playVideo();
       else if (s === 1 && Math.abs(p.getCurrentTime() - want) > 1.5) p.seekTo(want, true);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getState, setState, advance, clean, setVote, collectVotes } from "../../../lib/lk";
+import { getState, setState, advance, clean, setVote, collectVotes, listIds } from "../../../lib/lk";
 export const dynamic = "force-dynamic";
 
 const dec = (s) => s.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
@@ -11,6 +11,11 @@ export async function POST(req) {
   const st = await getState(room);
   st.lb ||= {};
   const oldSinger = st.cur?.by;
+  // Bỏ các bài của người đã thoát phòng khỏi hàng chờ
+  if (b.action === "add" || b.action === "next") {
+    const ids = new Set(await listIds(room));
+    st.q = st.q.filter((x) => ids.has(x.by));
+  }
 
   if (b.action === "vote") {
     const r = st.rate, s = Math.round(+b.score);
