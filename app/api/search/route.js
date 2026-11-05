@@ -8,7 +8,7 @@ export async function GET(req) {
   const u = new URL("https://www.googleapis.com/youtube/v3/search");
   const p = { part: "snippet", type: "video", videoEmbeddable: "true", maxResults: "8", q: q + " karaoke", key };
   for (const k in p) u.searchParams.set(k, p[k]);
-  const j = await (await fetch(u)).json();
+  const j = await (await fetch(u, { next: { revalidate: 86400 } })).json();
   if (j.error) return NextResponse.json({ error: j.error.message }, { status: 502 });
   return NextResponse.json({ items: j.items.map((i) => ({ vid: i.id.videoId, title: i.snippet.title, thumb: i.snippet.thumbnails.default.url })) });
 }

@@ -6,6 +6,27 @@ const api = (p, body) =>
   fetch(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
+const MAX = 30;
+const ROOMS = [
+  { id: "hoang-gia", name: "Phòng Hoàng Gia", sub: "Tím vàng sang trọng", t: "royal" },
+  { id: "vip-1", name: "Phòng VIP 1", sub: "Đỏ neon sôi động", t: "neon" },
+  { id: "vip-2", name: "Phòng VIP 2", sub: "Xanh đại dương", t: "ocean" },
+  { id: "vip-3", name: "Phòng VIP 3", sub: "Xanh rừng ấm áp", t: "forest" },
+];
+const hue = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
+
+// Nhân vật pixel + bong bóng chat nổi trên đầu
+function Person({ p, text, big }) {
+  const h = hue(p.id);
+  return (
+    <div className={big ? "pp big" : "pp"}>
+      {text && <div className="bub">{text}</div>}
+      <i className="hair" style={{ background: `hsl(${(h + 120) % 360} 30% 22%)` }} />
+      <i className="head" />
+      <i className="body" style={{ background: `hsl(${h} 55% 58%)` }} />
+    </div>
+  );
+}
 
 let ytReady;
 const loadYT = () =>
@@ -20,25 +41,36 @@ const loadYT = () =>
 export default function Page() {
   const [me, setMe] = useState(null);
   const [name, setName] = useState("");
-  const [room, setRoom] = useState("phong-1");
+  const [room, setRoom] = useState("");
+  const [counts, setCounts] = useState({});
   useEffect(() => {
     setName(localStorage.getItem("kname") || "");
     const r = new URLSearchParams(location.search).get("r");
     if (r) setRoom(r);
+    const load = () => fetch("/api/rooms").then((x) => x.json()).then((d) => setCounts(d.counts || {})).catch(() => {});
+    load();
+    const iv = setInterval(load, 10000);
+    return () => clearInterval(iv);
   }, []);
   if (me) return <Karaoke {...me} />;
-  const join = (e) => {
-    e.preventDefault(); // cú bấm này mở khóa âm thanh của trình duyệt
+  const enter = (r) => { // cú bấm này mở khóa âm thanh của trình duyệt
     localStorage.setItem("kname", name);
-    setMe({ name: name.trim() || "Khách", room: cleanRoom(room) });
+    setMe({ name: name.trim() || "Khách", room: cleanRoom(r) });
   };
   return (
     <main className="join">
       <h1>Karaoke cùng nhau</h1>
-      <form onSubmit={join} style={{ display: "grid" }}>
-        <input type="text" placeholder="Tên của bạn" value={name} onChange={(e) => setName(e.target.value)} />
-        <input type="text" placeholder="Mã phòng" value={room} onChange={(e) => setRoom(e.target.value)} />
-        <button type="submit">Vào phòng</button>
+      <input type="text" placeholder="Tên của bạn" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="rooms">
+        {ROOMS.map((r) => (
+          <button key={r.id} className="card" data-t={r.t} onClick={() => enter(r.id)}>
+            <b>{r.name}</b><small>{r.sub}</small><em>{counts[r.id] || 0}/{MAX} ghế</em>
+          </button>
+        ))}
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); enter(room); }} style={{ display: "flex" }}>
+        <input type="text" placeholder="Hoặc nhập mã phòng riêng" value={room} onChange={(e) => setRoom(e.target.value)} />
+        <button type="submit">Vào</button>
       </form>
     </main>
   );
@@ -57,6 +89,17 @@ function Karaoke({ name, room }) {
   const [res, setRes] = useState([]);
   const [voted, setVoted] = useState({});
   const [now, setNow] = useState(Date.now());
+  const [bub, setBub] = useState({});
+  const [log, setLog] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const timers = useRef({});
+  const say = (idn, who, text) => {
+    setBub((b) => ({ ...b, [idn]: text }));
+    setLog((l) => [...l.slice(-19), { who, text }]);
+    clearTimeout(timers.current[idn]);
+    timers.current[idn] = setTimeout(() => setBub((b) => { const x = { ...b }; delete x[idn]; return x; }), 6000);
+  };
   const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1);
   const stRef = useRef(st);
   stRef.current = st;
@@ -79,11 +122,15 @@ function Karaoke({ name, room }) {
     let dead = false;
     const r = new Room({ audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
     lk.current = r;
-    const sync = () => setPeople([r.localParticipant, ...r.remoteParticipants.values()].map((p) => ({ id: p.identity, name: p.name || p.identity })));
+    const sync = () => setPeople([r.localParticipant, ...r.remoteParticipants.values()].map((p) => ({ id: p.identity, name: p.name || p.identity, at: p.joinedAt ? +p.joinedAt : 0 })));
     const meta = (m) => { try { setSt(JSON.parse(m)); } catch {} };
     r.on(RoomEvent.RoomMetadataChanged, meta)
       .on(RoomEvent.ParticipantConnected, sync)
       .on(RoomEvent.ParticipantDisconnected, sync)
+      .on(RoomEvent.DataReceived, (buf, p, _k, topic) => {
+        if (topic !== "chat" || !p) return;
+        try { say(p.identity, p.name || p.identity, String(JSON.parse(new TextDecoder().decode(buf)).t).slice(0, 120)); } catch {}
+      })
       .on(RoomEvent.TrackSubscribed, (t) => {
         if (t.kind !== Track.Kind.Audio) return;
         const el = t.attach();
@@ -181,6 +228,30 @@ function Karaoke({ name, room }) {
     if (d.error) setErr(d.error);
   };
   const board = Object.values(st.lb || {}).sort((a, b) => b.pts - a.pts).slice(0, 10);
+  const info = ROOMS.find((r) => r.id === room);
+  const theme = info?.t || "classic";
+  useEffect(() => {
+    document.body.dataset.t = theme;
+    return () => { delete document.body.dataset.t; };
+  }, [theme]);
+  const singer = people.find((p) => p.id === cur?.by);
+  const sorted = [...people].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  const seats = Array.from({ length: MAX }, (_, i) => sorted[i]);
+
+  // Tìm karaoke ngay khi gõ (chờ 450ms sau phím cuối)
+  useEffect(() => {
+    const k = q.trim();
+    if (k.length < 2 || ytId(k)) return setRes([]);
+    let dead = false;
+    const t = setTimeout(async () => {
+      setBusy(true);
+      const d = await fetch("/api/search?q=" + encodeURIComponent(k)).then((r) => r.json()).catch(() => ({ error: "Lỗi mạng" }));
+      if (dead) return;
+      setBusy(false);
+      d.error ? setErr(d.error) : (setErr(""), setRes(d.items));
+    }, 450);
+    return () => { dead = true; clearTimeout(t); };
+  }, [q]);
 
   const add = async (vid, title) => {
     setErr("");
@@ -188,17 +259,25 @@ function Karaoke({ name, room }) {
     if (d.error) setErr(d.error);
     else { setRes([]); setQ(""); }
   };
-  const search = async (e) => {
+  const search = (e) => {
     e.preventDefault();
     const v = ytId(q.trim());
-    if (v) return add(v);
-    const d = await fetch("/api/search?q=" + encodeURIComponent(q)).then((r) => r.json());
-    d.error ? setErr(d.error) : (setErr(""), setRes(d.items));
+    if (v) add(v);
+  };
+  const sendChat = (e) => {
+    e.preventDefault();
+    const t = msg.trim().slice(0, 120);
+    if (!t || !lk.current) return;
+    setMsg("");
+    say(id, name, t);
+    lk.current.localParticipant
+      .publishData(new TextEncoder().encode(JSON.stringify({ t })), { reliable: true, topic: "chat" })
+      .catch((x) => setErr(String(x.message || x)));
   };
 
   return (
     <main className="app">
-      <header><b>Phòng {room}</b><span>{people.length} người đang online</span></header>
+      <header><b>{info?.name || "Phòng " + room}</b><span>{people.length}/{MAX} ghế</span><button onClick={() => (location.href = "/")}>Rời phòng</button></header>
       <div className="vid"><div id="yt" /></div>
       <div className="now">
         {cur ? (
@@ -211,6 +290,32 @@ function Karaoke({ name, room }) {
           <h2>Chưa có bài nào. Chọn bài bên dưới để bắt đầu.</h2>
         )}
       </div>
+      <section className="hall">
+        <div className="stage">
+          {singer ? (
+            <><Person p={singer} text={bub[singer.id]} big /><small>{singer.name} đang hát</small></>
+          ) : (
+            <small>Sân khấu đang trống</small>
+          )}
+        </div>
+        <div className="seats">
+          {seats.map((p, i) => {
+            const on = p && p.id !== cur?.by;
+            return (
+              <div className="sc" key={i}>
+                {on ? <Person p={p} text={bub[p.id]} /> : <div className="pp" />}
+                <div className="chair" />
+                <small>{on ? p.name : ""}</small>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+      <form className="chat" onSubmit={sendChat}>
+        <input type="text" maxLength={120} placeholder="Nói gì với cả phòng…" value={msg} onChange={(e) => setMsg(e.target.value)} />
+        <button type="submit">Gửi</button>
+      </form>
+      {log.length > 0 && <div className="log">{log.map((l, i) => <div key={i}><b>{l.who}:</b> {l.text}</div>)}</div>}
       {rate && (
         <section className="sec">
           {rate.by === id ? (
@@ -243,10 +348,10 @@ function Karaoke({ name, room }) {
         }} /></label>
       </div>
       <section className="sec">
-        <h3>Chọn bài</h3>
+        <h3>Chọn bài {busy && <small>đang tìm…</small>}</h3>
         <form onSubmit={search}>
-          <input type="text" placeholder="Tên bài hát hoặc link YouTube" value={q} onChange={(e) => setQ(e.target.value)} />
-          <button type="submit">Tìm</button>
+          <input type="text" placeholder="Gõ tên bài để tìm karaoke, hoặc dán link YouTube" value={q} onChange={(e) => setQ(e.target.value)} />
+          <button type="submit">Thêm link</button>
         </form>
         <ul style={{ marginTop: ".6rem" }}>
           {res.map((r) => (
@@ -275,12 +380,6 @@ function Karaoke({ name, room }) {
         ) : (
           <p style={{ margin: 0, color: "var(--dim)" }}>Chưa có ai được chấm điểm.</p>
         )}
-      </section>
-      <section className="sec">
-        <h3>Trong phòng</h3>
-        <div className="seats">
-          {people.map((p) => (<span key={p.id} className={p.id === cur?.by ? "seat on" : "seat"}>{p.name}</span>))}
-        </div>
       </section>
       {err && <p className="err">{err}</p>}
     </main>
