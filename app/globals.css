@@ -64,3 +64,5 @@ body[data-t=forest]{--bg:#08140d;--panel:#10241a;--line:#245038;--hot:#4ade80;--
 .row{display:flex;gap:.5rem;align-items:center;margin:.35rem 0}
 .row input[type=range]{flex:1}
 .sec small{display:block;color:var(--dim);margin-top:.3rem}
+button.alt{background:transparent;color:var(--hot);border:1px solid var(--hot)}
+.presets{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem}

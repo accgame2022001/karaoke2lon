@@ -19,9 +19,11 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Danh sách 10 bài vừa hát của phòng cho phép chọn lại. Bấm ☆ để lưu bài; bài đã lưu nằm trên trình duyệt đang dùng, không đồng bộ giữa các thiết bị.
 
 ## Giọng hát
-- Giọng của người hát đi qua bộ xử lý trước khi gửi lên phòng: khử ồn và khử vọng của trình duyệt, cắt tiếng ù, EQ cho giọng đầy và rõ lời, nén cho đều tiếng, và vang chỉnh được từ 0 đến 60%.
-- Nghe lại giọng mình được bật mặc định. Nên đeo tai nghe, nếu không loa sẽ bị hú.
-- Lựa chọn được nhớ trên trình duyệt đang dùng. Người nghe không bị ảnh hưởng và không bao giờ mở mic.
+- Giọng người hát đi qua chuỗi xử lý kiểu dàn karaoke: cổng lọc ồn, cắt tiếng ù, EQ (ấm, bớt đục, rõ lời, sáng), nén, vang hội trường, echo, chorus và giới hạn đỉnh.
+- Có 3 kiểu nhanh: Tiệm karaoke, Phòng thu, Hội trường. Vang và echo chỉnh được từ 0 đến 100%.
+- Khử ồn của trình duyệt luôn tắt vì nó làm giọng hát nghe như nói chuyện. Đeo tai nghe thì bật ô tai nghe để tắt luôn khử vọng.
+- Nghe lại giọng mình được bật mặc định, nên đeo tai nghe để không bị hú.
+- Lựa chọn được nhớ trên trình duyệt đang dùng.
 
 ## Chấm điểm và bảng xếp hạng
 - Hát xong, mọi người (trừ người hát) có 10 giây chấm từ 1 đến 10. Bấm Bỏ qua bài thì không chấm.

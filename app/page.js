@@ -8,6 +8,12 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
+const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false };
+const PRESETS = [
+  { n: "Tiệm karaoke", reverb: 55, echo: 30 },
+  { n: "Phòng thu", reverb: 25, echo: 8 },
+  { n: "Hội trường", reverb: 80, echo: 15 },
+];
 const ROOMS = [
   { id: "hoang-gia", name: "Phòng Hoàng Gia", sub: "Tím vàng sang trọng", t: "royal" },
   { id: "vip-1", name: "Phòng VIP 1", sub: "Đỏ neon sôi động", t: "neon" },
@@ -111,13 +117,13 @@ function Karaoke({ name, room }) {
   const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
   // Lọc tiếng và nghe lại giọng mình: mặc định bật, nhớ lựa chọn trên máy này
   const [fx, setFx] = useState(() => {
-    try { return { filter: true, reverb: 25, monitor: true, ...JSON.parse(localStorage.getItem("kfx")) }; } catch { return { filter: true, reverb: 25, monitor: true }; }
+    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx2")) }; } catch { return FX0; }
   });
   const fxRef = useRef(fx);
   fxRef.current = fx;
   useEffect(() => {
     voice.current?.set(fx);
-    try { localStorage.setItem("kfx", JSON.stringify(fx)); } catch {}
+    try { localStorage.setItem("kfx2", JSON.stringify(fx)); } catch {}
   }, [fx]);
   const toggleSave = (vid, title) => setSaved((s) => {
     const n = s.some((x) => x.vid === vid) ? s.filter((x) => x.vid !== vid) : [{ vid, title }, ...s].slice(0, 50);
@@ -213,6 +219,7 @@ function Karaoke({ name, room }) {
     const go = async () => {
       try {
         if (!mic) return await stopMic();
+        if (voice.current && voice.current.ear !== fxRef.current.ear) await stopMic(); // đổi chế độ tai nghe thì mở lại mic
         if (voice.current || starting.current) return;
         starting.current = true;
         const v = await startVoice(fxRef.current);
@@ -231,7 +238,7 @@ function Karaoke({ name, room }) {
     };
     go();
     return () => { stop = true; };
-  }, [mic, cur?.t0, people.length]);
+  }, [mic, fx.ear, cur?.t0, people.length]);
 
   // 3) Phát YouTube đồng bộ theo mốc thời gian t0 của máy chủ
   useEffect(() => {
@@ -371,10 +378,17 @@ function Karaoke({ name, room }) {
       {mic && (
         <section className="sec">
           <h3>Giọng hát của bạn</h3>
-          <label className="row"><input type="checkbox" checked={fx.filter} onChange={(e) => setFx({ ...fx, filter: e.target.checked })} /> Lọc tiếng: giọng đầy, rõ lời, đều tiếng</label>
+          <div className="presets">
+            {PRESETS.map((p) => (
+              <button key={p.n} className={fx.filter && fx.reverb === p.reverb && fx.echo === p.echo ? "" : "alt"} onClick={() => setFx({ ...fx, filter: true, reverb: p.reverb, echo: p.echo })}>{p.n}</button>
+            ))}
+          </div>
+          <label className="row"><input type="checkbox" checked={fx.filter} onChange={(e) => setFx({ ...fx, filter: e.target.checked })} /> Hiệu ứng karaoke (EQ, vang, echo)</label>
+          <label className="row">Vang <input type="range" min="0" max="100" value={fx.reverb} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, reverb: +e.target.value })} /> {fx.reverb}%</label>
+          <label className="row">Echo <input type="range" min="0" max="100" value={fx.echo} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, echo: +e.target.value })} /> {fx.echo}%</label>
+          <label className="row"><input type="checkbox" checked={fx.ear} onChange={(e) => setFx({ ...fx, ear: e.target.checked })} /> Tôi đang đeo tai nghe (giọng tự nhiên hơn)</label>
           <label className="row"><input type="checkbox" checked={fx.monitor} onChange={(e) => setFx({ ...fx, monitor: e.target.checked })} /> Nghe lại giọng mình</label>
-          <label className="row">Vang <input type="range" min="0" max="60" value={fx.reverb} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, reverb: +e.target.value })} /> {fx.reverb}%</label>
-          {fx.monitor && <small>Hãy đeo tai nghe khi nghe lại giọng mình, nếu không loa sẽ bị hú. Tai nghe Bluetooth có thể làm giọng nghe lại bị trễ.</small>}
+          <small>Đeo tai nghe có dây rồi bật hai ô trên để có giọng hay nhất. Hát bằng loa ngoài thì để tắt ô tai nghe và tắt nghe lại, nếu không sẽ bị hú.</small>
         </section>
       )}
       {singing && (st.ask || []).length > 0 && (
