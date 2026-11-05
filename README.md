@@ -13,6 +13,11 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Chat hiện thành bong bóng trên đầu người gửi trong 6 giây, kèm danh sách tin nhắn gần đây.
 - Gõ tên bài vào ô Chọn bài để tìm karaoke. Cần `YOUTUBE_API_KEY`; hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày, kết quả được lưu 1 ngày để tiết kiệm.
 
+## Chọn ghế, hát chung, bài đã lưu
+- Bấm vào ghế trống để chuyển chỗ ngồi. Ghế của người đã thoát tự được giải phóng.
+- Người xem bấm Xin hát chung, người đang hát bấm Cho hát hoặc Từ chối. Tối đa 3 người hát chung, ai được duyệt thì được mở mic và cùng nhận điểm.
+- Danh sách 10 bài vừa hát của phòng cho phép chọn lại. Bấm ☆ để lưu bài; bài đã lưu nằm trên trình duyệt đang dùng, không đồng bộ giữa các thiết bị.
+
 ## Chấm điểm và bảng xếp hạng
 - Hát xong, mọi người (trừ người hát) có 10 giây chấm từ 1 đến 10. Bấm Bỏ qua bài thì không chấm.
 - Điểm bài = trung bình các phiếu. Bảng xếp hạng cộng điểm các bài đã hát theo tên người hát, kèm điểm trung bình.

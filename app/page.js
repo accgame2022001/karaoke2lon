@@ -76,13 +76,25 @@ export default function Page() {
   );
 }
 
+function Song({ s, saved, onSave, children }) {
+  const on = saved.some((x) => x.vid === s.vid);
+  return (
+    <li>
+      {s.thumb && <img src={s.thumb} alt="" />}
+      <span style={{ flex: 1 }}>{s.title}{s.byName && <em> {s.byName}</em>}</span>
+      <button className="star" aria-label="Lưu bài" onClick={() => onSave(s.vid, s.title)}>{on ? "★" : "☆"}</button>
+      {children}
+    </li>
+  );
+}
+
 function Karaoke({ name, room }) {
   const [id] = useState(() => {
     let v = sessionStorage.getItem("kid");
     if (!v) sessionStorage.setItem("kid", (v = Math.random().toString(36).slice(2, 10)));
     return v;
   });
-  const [st, setSt] = useState({ q: [], cur: null, lb: {}, rate: null, last: null });
+  const [st, setSt] = useState({ q: [], cur: null, lb: {}, rate: null, last: null, hist: [], seat: {}, ask: [] });
   const [people, setPeople] = useState([]);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
@@ -93,6 +105,13 @@ function Karaoke({ name, room }) {
   const [log, setLog] = useState([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  // Bài đã lưu nằm trên trình duyệt này (localStorage), không đồng bộ giữa các thiết bị
+  const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
+  const toggleSave = (vid, title) => setSaved((s) => {
+    const n = s.some((x) => x.vid === vid) ? s.filter((x) => x.vid !== vid) : [{ vid, title }, ...s].slice(0, 50);
+    try { localStorage.setItem("ksaved", JSON.stringify(n)); } catch {}
+    return n;
+  });
   const timers = useRef({});
   const say = (idn, who, text) => {
     setBub((b) => ({ ...b, [idn]: text }));
@@ -106,6 +125,9 @@ function Karaoke({ name, room }) {
   peopleRef.current = people;
   const cur = st.cur;
   const singing = cur?.by === id;
+  const duo = cur?.duo || [];
+  const inDuo = duo.some((d) => d.id === id);
+  const mic = singing || inDuo; // người hát chính và người hát chung đều được mở mic
 
   const next = (skip) => api("/api/room", { room, action: "next", t0: stRef.current.cur?.t0, skip: skip === true });
 
@@ -166,19 +188,19 @@ function Karaoke({ name, room }) {
     const go = async () => {
       const lp = r.localParticipant;
       try {
-        if (singing) await lp.setMicrophoneEnabled(true);
+        if (mic) await lp.setMicrophoneEnabled(true);
         else {
           const t = lp.getTrackPublication(Track.Source.Microphone)?.track;
           if (t) await lp.unpublishTrack(t, true);
         }
       } catch (e) {
-        if (singing && !stop && n++ < 4) setTimeout(go, 1000); // quyền publish có thể đến chậm
-        else if (singing) setErr("Không bật được mic: " + e.message);
+        if (mic && !stop && n++ < 4) setTimeout(go, 1000); // quyền publish có thể đến chậm
+        else if (mic) setErr("Không bật được mic: " + e.message);
       }
     };
     go();
     return () => { stop = true; };
-  }, [singing, cur?.t0, people.length]);
+  }, [mic, cur?.t0, people.length]);
 
   // 3) Phát YouTube đồng bộ theo mốc thời gian t0 của máy chủ
   useEffect(() => {
@@ -242,9 +264,18 @@ function Karaoke({ name, room }) {
     document.body.dataset.t = theme;
     return () => { delete document.body.dataset.t; };
   }, [theme]);
-  const singer = people.find((p) => p.id === cur?.by);
+  const pubIds = cur ? [cur.by, ...duo.map((d) => d.id)] : [];
+  const onStage = pubIds.map((x) => people.find((p) => p.id === x)).filter(Boolean);
+  // Ghế: ai đã chọn ghế thì ngồi đúng ghế đó, ai chưa chọn thì được xếp vào ghế trống đầu tiên
   const sorted = [...people].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
-  const seats = Array.from({ length: MAX }, (_, i) => sorted[i]);
+  const seats = Array(MAX).fill(null);
+  const unseated = [];
+  for (const p of sorted) {
+    const n = st.seat?.[p.id];
+    if (Number.isInteger(n) && n >= 0 && n < MAX && !seats[n]) seats[n] = p;
+    else unseated.push(p);
+  }
+  for (const p of unseated) { const i = seats.indexOf(null); if (i >= 0) seats[i] = p; }
 
   // Tìm karaoke ngay khi gõ (chờ 450ms sau phím cuối)
   useEffect(() => {
@@ -267,6 +298,11 @@ function Karaoke({ name, room }) {
     if (d.error) setErr(d.error);
     else { setRes([]); setQ(""); }
   };
+  const sit = async (n) => {
+    const d = await api("/api/room", { room, action: "seat", n, identity: id });
+    setErr(d.error || "");
+  };
+  const duoAct = (action, who) => api("/api/room", { room, action, identity: id, name, who });
   const search = (e) => {
     e.preventDefault();
     const v = ytId(q.trim());
@@ -290,27 +326,46 @@ function Karaoke({ name, room }) {
       <div className="now">
         {cur ? (
           <>
-            <small>{singing ? "Đến lượt bạn hát! Mic đang mở" : cur.byName + " đang hát"}</small>
+            <small>{singing ? "Đến lượt bạn hát! Mic đang mở" : inDuo ? "Bạn đang hát chung! Mic đang mở" : cur.byName + (duo.length ? " hát chung với " + duo.map((d) => d.name).join(", ") : "") + " đang hát"}</small>
             <h2>{cur.title}</h2>
             {singing && <button onClick={() => next(true)}>Bỏ qua bài</button>}
+            {inDuo && <button onClick={() => duoAct("duo_leave")}>Thôi hát chung</button>}
+            {!mic && (st.ask || []).some((x) => x.id === id) && <small> Đã xin hát chung, chờ {cur.byName} đồng ý</small>}
+            {!mic && !(st.ask || []).some((x) => x.id === id) && duo.length < 3 && <button onClick={() => duoAct("duo_ask")}>Xin hát chung</button>}
           </>
         ) : (
           <h2>Chưa có bài nào. Chọn bài bên dưới để bắt đầu.</h2>
         )}
       </div>
+      {singing && (st.ask || []).length > 0 && (
+        <section className="sec">
+          <h3>Xin hát chung</h3>
+          <ul>
+            {st.ask.map((x) => (
+              <li key={x.id}><span style={{ flex: 1 }}>{x.name}</span>
+                <button onClick={() => duoAct("duo_ok", x.id)}>Cho hát</button>
+                <button onClick={() => duoAct("duo_no", x.id)}>Từ chối</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <section className="hall">
         <div className="stage">
-          {singer ? (
-            <><Person p={singer} text={bub[singer.id]} big /><small>{singer.name} đang hát</small></>
+          {onStage.length ? (
+            <>
+              <div className="duo">{onStage.map((p) => <Person key={p.id} p={p} text={bub[p.id]} big />)}</div>
+              <small>{onStage.map((p) => p.name).join(" & ")} đang hát</small>
+            </>
           ) : (
             <small>Sân khấu đang trống</small>
           )}
         </div>
         <div className="seats">
           {seats.map((p, i) => {
-            const on = p && p.id !== cur?.by;
+            const on = p && !pubIds.includes(p.id);
             return (
-              <div className="sc" key={i}>
+              <div className={"sc" + (p ? "" : " free") + (p?.id === id ? " me" : "")} key={i} title={p ? "" : "Ngồi vào ghế này"} onClick={() => !p && sit(i)}>
                 {on ? <Person p={p} text={bub[p.id]} /> : <div className="pp" />}
                 <div className="chair" />
                 <small>{on ? p.name : ""}</small>
@@ -326,7 +381,7 @@ function Karaoke({ name, room }) {
       {log.length > 0 && <div className="log">{log.map((l, i) => <div key={i}><b>{l.who}:</b> {l.text}</div>)}</div>}
       {rate && (
         <section className="sec">
-          {rate.by === id ? (
+          {rate.by === id || (rate.duo || []).some((d) => d.id === id) ? (
             <h3>Mọi người đang chấm điểm bạn · còn {left}s</h3>
           ) : (
             <>
@@ -363,7 +418,7 @@ function Karaoke({ name, room }) {
         </form>
         <ul style={{ marginTop: ".6rem" }}>
           {res.map((r) => (
-            <li key={r.vid}><img src={r.thumb} alt="" /><span style={{ flex: 1 }}>{r.title}</span><button onClick={() => add(r.vid, r.title)}>Thêm</button></li>
+            <Song key={r.vid} s={r} saved={saved} onSave={toggleSave}><button onClick={() => add(r.vid, r.title)}>Thêm</button></Song>
           ))}
         </ul>
       </section>
@@ -371,11 +426,35 @@ function Karaoke({ name, room }) {
         <h3>Hàng chờ ({st.q.length})</h3>
         <ul>
           {st.q.map((s, i) => (
-            <li key={i}><span style={{ flex: 1 }}>{s.title} <em>{s.byName}</em></span>
+            <Song key={i} s={s} saved={saved} onSave={toggleSave}>
               {s.by === id && <button onClick={() => api("/api/room", { room, action: "remove", i, identity: id })}>Xóa</button>}
-            </li>
+            </Song>
           ))}
         </ul>
+      </section>
+      <section className="sec">
+        <h3>Bài đã lưu ({saved.length})</h3>
+        {saved.length ? (
+          <ul>
+            {saved.map((s) => (
+              <Song key={s.vid} s={s} saved={saved} onSave={toggleSave}><button onClick={() => add(s.vid, s.title)}>Thêm</button></Song>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: "var(--dim)" }}>Bấm ☆ cạnh bài hát để lưu, lần sau chọn luôn.</p>
+        )}
+      </section>
+      <section className="sec">
+        <h3>10 bài vừa hát trong phòng</h3>
+        {(st.hist || []).length ? (
+          <ul>
+            {st.hist.map((s) => (
+              <Song key={s.vid} s={s} saved={saved} onSave={toggleSave}><button onClick={() => add(s.vid, s.title)}>Chọn lại</button></Song>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: "var(--dim)" }}>Chưa có bài nào được hát xong.</p>
+        )}
       </section>
       <section className="sec">
         <h3>Bảng xếp hạng</h3>

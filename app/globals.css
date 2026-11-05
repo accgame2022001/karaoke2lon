@@ -56,3 +56,8 @@ body[data-t=forest]{--bg:#08140d;--panel:#10241a;--line:#245038;--hot:#4ade80;--
 .chat{display:flex;gap:.5rem}
 .log{max-height:90px;overflow:auto;font-size:.85rem;color:var(--dim)}
 .log b{color:var(--ink)}
+.sc.free{cursor:pointer}
+.sc.free:hover .chair{outline:2px solid var(--on)}
+.sc.me small{color:var(--on);font-weight:700}
+.duo{display:flex;gap:1.6rem;align-items:flex-end}
+.star{background:transparent;color:var(--hot);padding:.2rem .5rem;font-size:1.15rem}
