@@ -8,7 +8,7 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
-const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false };
+const FX0 = { filter: true, reverb: 55, echo: 30, monitor: true, ear: false, gate: false };
 const PRESETS = [
   { n: "Tiệm karaoke", reverb: 55, echo: 30 },
   { n: "Phòng thu", reverb: 25, echo: 8 },
@@ -386,6 +386,7 @@ function Karaoke({ name, room }) {
           <label className="row"><input type="checkbox" checked={fx.filter} onChange={(e) => setFx({ ...fx, filter: e.target.checked })} /> Hiệu ứng karaoke (EQ, vang, echo)</label>
           <label className="row">Vang <input type="range" min="0" max="100" value={fx.reverb} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, reverb: +e.target.value })} /> {fx.reverb}%</label>
           <label className="row">Echo <input type="range" min="0" max="100" value={fx.echo} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, echo: +e.target.value })} /> {fx.echo}%</label>
+          <label className="row"><input type="checkbox" checked={fx.gate} onChange={(e) => setFx({ ...fx, gate: e.target.checked })} /> Giảm ồn nền (có thể làm nhỏ tiếng khi hát khẽ)</label>
           <label className="row"><input type="checkbox" checked={fx.ear} onChange={(e) => setFx({ ...fx, ear: e.target.checked })} /> Tôi đang đeo tai nghe (giọng tự nhiên hơn)</label>
           <label className="row"><input type="checkbox" checked={fx.monitor} onChange={(e) => setFx({ ...fx, monitor: e.target.checked })} /> Nghe lại giọng mình</label>
           <small>Đeo tai nghe có dây rồi bật hai ô trên để có giọng hay nhất. Hát bằng loa ngoài thì để tắt ô tai nghe và tắt nghe lại, nếu không sẽ bị hú.</small>
