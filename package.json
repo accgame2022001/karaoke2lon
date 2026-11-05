@@ -1,0 +1,12 @@
+{
+  "name": "karaoke-room",
+  "private": true,
+  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "dependencies": {
+    "next": "^15.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "livekit-client": "^2.5.0",
+    "livekit-server-sdk": "^2.6.0"
+  }
+}
