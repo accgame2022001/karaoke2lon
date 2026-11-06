@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getState, setState, advance, clean, setVote, collectVotes, listIds, pubs, MAX } from "../../../lib/lk";
+import { getState, setState, advance, clean, setVote, collectVotes, listIds, MAX } from "../../../lib/lk";
 export const dynamic = "force-dynamic";
 
 const dec = (s) => s.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
@@ -12,7 +12,6 @@ export async function POST(req) {
   if (!room) return bad("Thiếu tên phòng");
   const st = await getState(room);
   st.lb ||= {}; st.hist ||= []; st.seat ||= {}; st.ask ||= [];
-  const old = pubs(st);
   const a = b.action;
 
   if (a === "vote") {
@@ -88,6 +87,6 @@ export async function POST(req) {
     if (Object.entries(st.seat).some(([k, v]) => v === n && k !== b.identity)) return bad("Ghế này đã có người ngồi", 409);
     st.seat[b.identity] = n;
   }
-  await setState(room, st, old);
+  await setState(room, st);
   return ok();
 }

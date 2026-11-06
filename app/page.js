@@ -8,7 +8,7 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
-const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: true, gate: true, gain: 6 };
+const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: true, gate: true, gain: 6, plain: false };
 const PRESETS = [
   { n: "Rõ lời", reverb: 10, echo: 0 },
   { n: "Ca sĩ", reverb: 28, echo: 14 },
@@ -114,6 +114,10 @@ function Karaoke({ name, room }) {
   const [log, setLog] = useState([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [micState, setMicState] = useState("off"); // off | starting | live | plain | retry
+  const [canPlay, setCanPlay] = useState(true);
+  const [speaking, setSpeaking] = useState(new Set());
+  const [tk, setTk] = useState(0);
   // Bài đã lưu nằm trên trình duyệt này (localStorage), không đồng bộ giữa các thiết bị
   const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
   // Lọc tiếng và nghe lại giọng mình: mặc định bật, nhớ lựa chọn trên máy này
@@ -138,10 +142,15 @@ function Karaoke({ name, room }) {
     clearTimeout(timers.current[idn]);
     timers.current[idn] = setTimeout(() => setBub((b) => { const x = { ...b }; delete x[idn]; return x; }), 6000);
   };
-  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1), peopleRef = useRef([]), gone = useRef(0), voice = useRef(null), starting = useRef(false), remote = useRef(new Map());
+  const lk = useRef(null), yt = useRef(null), off = useRef(0), voiceVol = useRef(1), peopleRef = useRef([]), gone = useRef(0), voice = useRef(null), starting = useRef(false), remote = useRef(new Map()), allowRef = useRef([]), usingPlain = useRef(false), fails = useRef(0);
   // Âm lượng giọng người hát: đến 100% dùng loa thường, trên 100% khuếch đại bằng Web Audio
   const applyVol = (e) => {
     const v = voiceVol.current;
+    if (!allowRef.current.includes(e.who)) { // chỉ nghe tiếng của người đang hát
+      e.el.muted = true;
+      if (e.g) e.g.gain.value = 0;
+      return;
+    }
     if (v <= 1) {
       e.el.muted = false;
       e.el.volume = v;
@@ -181,48 +190,79 @@ function Karaoke({ name, room }) {
     pos() < 0 ? setTimeout(go, -pos() * 1000) : go();
   };
 
-  // 1) Kết nối phòng. Người nghe KHÔNG bao giờ xin quyền mic.
+  // 1) Kết nối phòng, tự kết nối lại khi rớt mạng. Người nghe KHÔNG bao giờ xin quyền mic.
   useEffect(() => {
     let dead = false;
-    const r = new Room({ audioCaptureDefaults: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
+    const r = new Room();
     lk.current = r;
     const sync = () => setPeople([r.localParticipant, ...r.remoteParticipants.values()].map((p) => ({ id: p.identity, name: p.name || p.identity, at: p.joinedAt ? +p.joinedAt : 0 })));
     const meta = (m) => { try { setSt(JSON.parse(m)); } catch {} };
+    const unlock = () => { unlockAudio(); r.startAudio().catch(() => {}); }; // chạm bất kỳ đâu cũng mở khóa âm thanh
+    const onVis = () => {
+      if (document.hidden) return;
+      unlock();
+      if (r.state === "connected") { sync(); meta(r.metadata); }
+    };
     r.on(RoomEvent.RoomMetadataChanged, meta)
       .on(RoomEvent.ParticipantConnected, sync)
       .on(RoomEvent.ParticipantDisconnected, sync)
+      .on(RoomEvent.Reconnected, () => { sync(); meta(r.metadata); })
+      .on(RoomEvent.Disconnected, () => {
+        if (dead) return;
+        setErr("Mất kết nối, đang kết nối lại…");
+        setTimeout(() => !dead && join(), 1500);
+      })
+      .on(RoomEvent.AudioPlaybackStatusChanged, () => setCanPlay(r.canPlaybackAudio))
+      .on(RoomEvent.ActiveSpeakersChanged, (sp) => setSpeaking(new Set(sp.map((x) => x.identity))))
       .on(RoomEvent.DataReceived, (buf, p, _k, topic) => {
         if (topic !== "chat" || !p) return;
         try { say(p.identity, p.name || p.identity, String(JSON.parse(new TextDecoder().decode(buf)).t).slice(0, 120)); } catch {}
       })
-      .on(RoomEvent.TrackSubscribed, (t) => {
+      .on(RoomEvent.TrackSubscribed, (t, _pub, p) => {
         if (t.kind !== Track.Kind.Audio) return;
         const el = t.attach();
         el.dataset.voice = "1";
         document.body.append(el);
-        const e = { t, el };
+        const e = { t, el, who: p.identity };
         remote.current.set(t.sid, e);
         applyVol(e);
+        setTk((x) => x + 1);
       })
       .on(RoomEvent.TrackUnsubscribed, (t) => {
         t.detach().forEach((e) => e.remove());
         const e = remote.current.get(t.sid);
         try { e?.s?.disconnect(); e?.g?.disconnect(); } catch {}
         remote.current.delete(t.sid);
+        setTk((x) => x + 1);
       });
-    (async () => {
-      const d = await api("/api/token", { room, identity: id, name });
-      if (dead) return;
-      if (!d.token) return setErr(d.error || "Không vào được phòng");
-      off.current = d.now - Date.now();
-      await r.connect(d.url, d.token);
-      if (dead) return r.disconnect();
-      await r.startAudio().catch(() => {});
-      sync();
-      meta(r.metadata);
-    })().catch((e) => setErr(String(e.message || e)));
+    const join = async () => {
+      for (let n = 0; !dead; n++) {
+        try {
+          const d = await api("/api/token", { room, identity: id, name });
+          if (dead) return;
+          if (!d.token) return setErr(d.error || "Không vào được phòng");
+          off.current = d.now - Date.now();
+          await r.connect(d.url, d.token);
+          if (dead) return r.disconnect();
+          await r.startAudio().catch(() => {});
+          sync();
+          meta(r.metadata);
+          setCanPlay(r.canPlaybackAudio);
+          setErr("");
+          return;
+        } catch {
+          setErr("Không kết nối được, đang thử lại…");
+          await new Promise((res) => setTimeout(res, Math.min(8000, 1500 * (n + 1))));
+        }
+      }
+    };
+    join();
+    document.addEventListener("pointerdown", unlock, { passive: true });
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       dead = true;
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("visibilitychange", onVis);
       r.disconnect();
       voice.current?.stop();
       voice.current = null;
@@ -230,45 +270,74 @@ function Karaoke({ name, room }) {
     };
   }, []);
 
-  // 2) Mic: chỉ mở khi tới lượt; giọng đi qua bộ lọc (EQ, nén, vang) rồi mới phát lên phòng
+  // 2) Mic có giám sát: tự dựng lại khi mic bị ngắt, AudioContext bị tạm dừng, rớt kết nối hoặc đầu ra bị câm.
+  //    Nếu bộ hiệu ứng lỗi liên tiếp thì tự chuyển sang mic thường của LiveKit (ổn định nhất).
   const micRef = useRef(false);
   micRef.current = mic;
   const stopMic = async () => {
     const v = voice.current;
     voice.current = null;
-    if (!v) return;
     const lp = lk.current?.localParticipant;
     const t = lp?.getTrackPublication(Track.Source.Microphone)?.track;
-    if (t) await lp.unpublishTrack(t, false).catch(() => {});
-    v.stop(); // nhả mic hoàn toàn
+    if (t) await lp.unpublishTrack(t, !v).catch(() => {}); // mic thường: dừng luôn; mic hiệu ứng: dừng ở bước dưới
+    v?.stop(); // nhả mic hoàn toàn
   };
-  useEffect(() => {
-    const r = lk.current;
-    if (!r || r.state !== "connected") return;
-    let n = 0, stop = false;
-    const go = async () => {
-      try {
-        if (!mic) return await stopMic();
-        if (voice.current && voice.current.ear !== fxRef.current.ear) await stopMic(); // đổi chế độ tai nghe thì mở lại mic
-        if (voice.current || starting.current) return;
-        starting.current = true;
+  const startMic = async () => {
+    const lp = lk.current.localParticipant;
+    starting.current = true;
+    setMicState("starting");
+    try {
+      const plain = fxRef.current.plain;
+      usingPlain.current = plain;
+      if (plain) {
+        await lp.setMicrophoneEnabled(true, { echoCancellation: !fxRef.current.ear, noiseSuppression: false, autoGainControl: true }, { dtx: false });
+      } else {
         const v = await startVoice(fxRef.current);
-        if (!micRef.current) return v.stop();
+        if (!micRef.current) { v.stop(); setMicState("off"); return; }
         voice.current = v;
-        await r.localParticipant.publishTrack(new LocalAudioTrack(v.track, undefined, true), {
+        await lp.publishTrack(new LocalAudioTrack(v.track, undefined, true), {
           source: Track.Source.Microphone, name: "mic", dtx: false, audioPreset: { maxBitrate: 96000 },
         });
-      } catch (e) {
-        await stopMic();
-        if (mic && !stop && n++ < 4) setTimeout(go, 1000); // quyền publish có thể đến chậm
-        else if (mic) setErr("Không bật được mic: " + e.message);
-      } finally {
-        starting.current = false;
       }
+      fails.current = 0;
+      setMicState(plain ? "plain" : "live");
+      setErr("");
+    } catch (e) {
+      await stopMic();
+      setMicState("retry");
+      if (++fails.current >= 2 && !fxRef.current.plain) {
+        setFx((f) => ({ ...f, plain: true }));
+        setErr("Mic hiệu ứng chưa ổn định trên máy này, đã chuyển sang mic thường.");
+      } else setErr("Không bật được mic: " + (e.message || e));
+    } finally {
+      starting.current = false;
+    }
+  };
+  const healthy = () => {
+    const pub = lk.current?.localParticipant.getTrackPublication(Track.Source.Microphone);
+    const mt = pub?.track?.mediaStreamTrack;
+    if (!pub?.track || pub.isMuted || !mt || mt.readyState !== "live") return false;
+    if (usingPlain.current !== fxRef.current.plain) return false; // đổi chế độ mic thường / hiệu ứng
+    const v = voice.current;
+    if (v && (!v.alive() || v.ear !== fxRef.current.ear)) return false;
+    return true;
+  };
+  useEffect(() => {
+    if (!mic) { stopMic(); setMicState("off"); fails.current = 0; return; }
+    let live = true, bad = 0, cool = 0;
+    const tick = async () => {
+      if (!live || starting.current || lk.current?.state !== "connected") return;
+      if (healthy()) { bad = 0; return; }
+      if (++bad < (voice.current ? 2 : 1)) return; // cho 2 lần kiểm tra trước khi dựng lại
+      if (fails.current >= 3 && cool++ % 4) return; // lỗi nhiều lần thì thử thưa dần
+      bad = 0;
+      await stopMic();
+      if (live && micRef.current) await startMic();
     };
-    go();
-    return () => { stop = true; };
-  }, [mic, fx.ear, cur?.t0, people.length]);
+    tick();
+    const iv = setInterval(tick, 1500);
+    return () => { live = false; clearInterval(iv); };
+  }, [mic]);
 
   // Thanh đo mức tiếng của mic để người hát biết mic có nhận được giọng hay không
   const meterRef = useRef(null);
@@ -349,6 +418,10 @@ function Karaoke({ name, room }) {
     return () => { delete document.body.dataset.t; };
   }, [theme]);
   const pubIds = cur ? [cur.by, ...duo.map((d) => d.id)] : [];
+  allowRef.current = pubIds;
+  useEffect(() => { for (const e of remote.current.values()) applyVol(e); }, [pubIds.join(",")]);
+  const hearing = tk >= 0 && [...remote.current.values()].some((e) => pubIds.includes(e.who));
+  const stText = { off: "", starting: "Đang khởi động mic…", live: "Đang phát giọng lên phòng.", plain: "Đang phát giọng bằng mic thường (không hiệu ứng).", retry: "Mic chưa lên, đang thử lại…" }[micState];
   const onStage = pubIds.map((x) => people.find((p) => p.id === x)).filter(Boolean);
   // Ghế: ai đã chọn ghế thì ngồi đúng ghế đó, ai chưa chọn thì được xếp vào ghế trống đầu tiên
   const sorted = [...people].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
@@ -406,6 +479,7 @@ function Karaoke({ name, room }) {
   return (
     <main className="app">
       <header><b>{info?.name || "Phòng " + room}</b><span>{people.length}/{MAX} ghế</span><button onClick={() => (location.href = "/")}>Rời phòng</button></header>
+      {!canPlay && <button onClick={() => { unlockAudio(); lk.current?.startAudio(); }}>Chạm để bật âm thanh</button>}
       <div className="vid"><div id="yt" /></div>
       <div className="now">
         {cur ? (
@@ -424,8 +498,10 @@ function Karaoke({ name, room }) {
       {mic && (
         <section className="sec">
           <h3>Giọng hát của bạn</h3>
+          {stText && <small>{stText}</small>}
           <div className="meter"><i ref={meterRef} /></div>
           {quiet && <small className="err">Mic đang rất nhỏ hoặc chưa có tiếng. Nếu bạn đang hát mà thanh trên không nhảy, hãy tăng Độ nhạy mic và kiểm tra quyền mic của trình duyệt.</small>}
+          <label className="row"><input type="checkbox" checked={fx.plain} onChange={(e) => setFx({ ...fx, plain: e.target.checked })} /> Mic thường (ổn định nhất, không hiệu ứng, không nghe lại)</label>
           <label className="row">Mic tối đa <input type="range" min="1" max="10" step="0.5" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
           <div className="presets">
             {PRESETS.map((p) => (
@@ -459,7 +535,8 @@ function Karaoke({ name, room }) {
           {onStage.length ? (
             <>
               <div className="duo">{onStage.map((p) => <Person key={p.id} p={p} text={bub[p.id]} big />)}</div>
-              <small>{onStage.map((p) => p.name).join(" & ")} đang hát</small>
+              <small>{onStage.map((p) => (speaking.has(p.id) ? "● " : "") + p.name).join(" & ")} đang hát</small>
+              {!mic && !hearing && <small>Đang chờ giọng hát…</small>}
             </>
           ) : (
             <small>Sân khấu đang trống</small>

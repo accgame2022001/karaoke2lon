@@ -30,6 +30,13 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Nghe lại giọng mình được bật mặc định, nên đeo tai nghe để không bị hú.
 - Lựa chọn được nhớ trên trình duyệt đang dùng.
 
+## Độ ổn định âm thanh
+- Mọi người được cấp quyền kết nối mic sẵn từ lúc vào phòng; app chỉ mở mic của người đang hát và chỉ phát tiếng của những người đang hát, nên không còn bước cấp quyền giữa chừng.
+- Mic của người hát được giám sát mỗi 1,5 giây. Mic bị ngắt, AudioContext bị tạm dừng, rớt mạng hoặc đầu ra bị câm thì tự dựng lại.
+- Nếu bộ hiệu ứng lỗi 2 lần liên tiếp, app tự chuyển sang mic thường của LiveKit. Có thể bật ô Mic thường thủ công.
+- Rớt kết nối thì tự kết nối lại. Dấu chấm ● cạnh tên người hát cho biết giọng đang được phát; dòng Đang chờ giọng hát nghĩa là chưa nhận được âm thanh từ họ.
+- Nếu trình duyệt chặn phát âm thanh sẽ hiện nút Chạm để bật âm thanh.
+
 ## Chấm điểm và bảng xếp hạng
 - Hát xong, mọi người (trừ người hát) có 10 giây chấm từ 1 đến 10. Bấm Bỏ qua bài thì không chấm.
 - Điểm bài = trung bình các phiếu. Bảng xếp hạng cộng điểm các bài đã hát theo tên người hát, kèm điểm trung bình.
