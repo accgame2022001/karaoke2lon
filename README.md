@@ -30,6 +30,9 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Nghe lại giọng mình được bật mặc định, nên đeo tai nghe để không bị hú.
 - Lựa chọn được nhớ trên trình duyệt đang dùng.
 
+## Chống sập trang
+- Trạng thái phòng từ máy chủ luôn được chuẩn hóa (thiếu trường, null, sai dạng đều được xử lý), và nếu vẫn có lỗi bất ngờ thì app hiện thông báo kèm chi tiết cùng nút Tải lại thay vì trang trắng.
+
 ## Độ ổn định âm thanh
 - Mọi người được cấp quyền kết nối mic sẵn từ lúc vào phòng; app chỉ mở mic của người đang hát và chỉ phát tiếng của những người đang hát, nên không còn bước cấp quyền giữa chừng.
 - Mic của người hát được giám sát mỗi 1,5 giây. Mic bị ngắt, AudioContext bị tạm dừng, rớt mạng hoặc đầu ra bị câm thì tự dựng lại.

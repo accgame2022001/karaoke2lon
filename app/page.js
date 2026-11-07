@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, LocalAudioTrack } from "livekit-client";
 import { startVoice, unlockAudio, getCtx } from "../lib/voice";
 
@@ -8,6 +8,32 @@ const api = (p, body) =>
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
+// Trạng thái phòng luôn được chuẩn hóa: dù máy chủ gửi thiếu trường hay sai dạng thì giao diện vẫn không sập
+const EMPTY = { q: [], cur: null, lb: {}, rate: null, last: null, hist: [], seat: {}, ask: [] };
+const isObj = (x) => x && typeof x === "object" && !Array.isArray(x);
+const norm = (x) =>
+  isObj(x)
+    ? { ...EMPTY, ...x, q: Array.isArray(x.q) ? x.q : [], hist: Array.isArray(x.hist) ? x.hist : [], ask: Array.isArray(x.ask) ? x.ask : [], lb: isObj(x.lb) ? x.lb : {}, seat: isObj(x.seat) ? x.seat : {}, cur: isObj(x.cur) ? x.cur : null }
+    : null;
+
+// Nếu có lỗi bất ngờ thì hiện thông báo kèm chi tiết thay vì trang trắng
+class Boundary extends Component {
+  constructor(p) { super(p); this.state = { e: null }; }
+  static getDerivedStateFromError(e) { return { e }; }
+  componentDidCatch(e, info) { console.error("Karaoke lỗi:", e, info?.componentStack); }
+  render() {
+    const e = this.state.e;
+    if (!e) return this.props.children;
+    return (
+      <main className="join">
+        <h1>Có lỗi xảy ra</h1>
+        <p className="err">{String(e.message || e)}</p>
+        <pre style={{ whiteSpace: "pre-wrap", fontSize: ".75rem", color: "var(--dim)" }}>{String(e.stack || "").split("\n").slice(0, 5).join("\n")}</pre>
+        <button onClick={() => (location.href = "/")}>Tải lại</button>
+      </main>
+    );
+  }
+}
 const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: true, gate: true, gain: 6, plain: false };
 const PRESETS = [
   { n: "Rõ lời", reverb: 10, echo: 0 },
@@ -60,7 +86,7 @@ export default function Page() {
     const iv = setInterval(load, 10000);
     return () => clearInterval(iv);
   }, []);
-  if (me) return <Karaoke {...me} />;
+  if (me) return <Boundary><Karaoke {...me} /></Boundary>;
   const enter = (r) => { // cú bấm này mở khóa âm thanh của trình duyệt
     unlockAudio();
     localStorage.setItem("kname", name);
@@ -103,7 +129,7 @@ function Karaoke({ name, room }) {
     if (!v) sessionStorage.setItem("kid", (v = Math.random().toString(36).slice(2, 10)));
     return v;
   });
-  const [st, setSt] = useState({ q: [], cur: null, lb: {}, rate: null, last: null, hist: [], seat: {}, ask: [] });
+  const [st, setSt] = useState(EMPTY);
   const [people, setPeople] = useState([]);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
@@ -173,20 +199,20 @@ function Karaoke({ name, room }) {
   const stRef = useRef(st);
   stRef.current = st;
   peopleRef.current = people;
-  const cur = st.cur;
+  const cur = st?.cur;
   const singing = cur?.by === id;
   const duo = cur?.duo || [];
   const inDuo = duo.some((d) => d.id === id);
   const mic = singing || inDuo; // người hát chính và người hát chung đều được mở mic
 
-  const next = (skip) => api("/api/room", { room, action: "next", t0: stRef.current.cur?.t0, skip: skip === true });
+  const next = (skip) => api("/api/room", { room, action: "next", t0: stRef.current?.cur?.t0, skip: skip === true });
 
   const play = () => {
-    const p = yt.current, c = stRef.current.cur;
+    const p = yt.current, c = stRef.current?.cur;
     if (!p?.loadVideoById) return;
     if (!c) return p.stopVideo();
     const pos = () => (Date.now() + off.current - c.t0) / 1000;
-    const go = () => stRef.current.cur?.t0 === c.t0 && p.loadVideoById({ videoId: c.vid, startSeconds: Math.max(0, pos()) });
+    const go = () => stRef.current?.cur?.t0 === c.t0 && p.loadVideoById({ videoId: c.vid, startSeconds: Math.max(0, pos()) });
     pos() < 0 ? setTimeout(go, -pos() * 1000) : go();
   };
 
@@ -196,7 +222,7 @@ function Karaoke({ name, room }) {
     const r = new Room();
     lk.current = r;
     const sync = () => setPeople([r.localParticipant, ...r.remoteParticipants.values()].map((p) => ({ id: p.identity, name: p.name || p.identity, at: p.joinedAt ? +p.joinedAt : 0 })));
-    const meta = (m) => { try { setSt(JSON.parse(m)); } catch {} };
+    const meta = (m) => { try { const x = norm(JSON.parse(m)); if (x) setSt(x); } catch {} };
     const unlock = () => { unlockAudio(); r.startAudio().catch(() => {}); }; // chạm bất kỳ đâu cũng mở khóa âm thanh
     const onVis = () => {
       if (document.hidden) return;
@@ -370,7 +396,7 @@ function Karaoke({ name, room }) {
       });
     });
     const tick = setInterval(() => {
-      const p = yt.current, c = stRef.current.cur;
+      const p = yt.current, c = stRef.current?.cur;
       // Người hát đã thoát hơn 5 giây thì bỏ qua bài (không chấm điểm)
       if (c && lk.current?.state === "connected" && peopleRef.current.length && !peopleRef.current.some((x) => x.id === c.by)) {
         gone.current ||= Date.now();
