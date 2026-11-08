@@ -129,7 +129,7 @@ function Gallery({ who }) {
   return (
     <section className="gallery">
       {imgs.map((src, k) => <img key={src} src={"/dao/" + src} alt="" className={k === i ? "on" : ""} />)}
-      <div className="cap">{who ? who + " đang hát" : "Chọn bài để bắt đầu"}</div>
+    
     </section>
   );
 }
@@ -550,7 +550,7 @@ function Karaoke({ name, room }) {
             {!mic && !(st.ask || []).some((x) => x.id === id) && duo.length < 3 && <button onClick={() => duoAct("duo_ask")}>Xin hát chung</button>}
           </>
         ) : (
-          <h2>Chưa có bài nào. Chọn bài bên dưới để bắt đầu.</h2>
+          <h2>Phòng Đào thay đồ, dâm tặc chớ vào</h2>
         )}
       </div>
       {mic && (
