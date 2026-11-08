@@ -1,4 +1,4 @@
-# Karaoke cùng nhau
+# 5 Sao Plus
 
 Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, chỉ người đang hát mới mở mic.
 
@@ -13,6 +13,11 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Chat hiện thành bong bóng trên đầu người gửi trong 6 giây, kèm danh sách tin nhắn gần đây.
 - Gõ tên bài vào ô Chọn bài để tìm karaoke. Cần `YOUTUBE_API_KEY`; hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày, kết quả được lưu 1 ngày để tiết kiệm.
 
+## Phòng Đào
+- Phòng này chỉ trình chiếu hình ảnh (đổi ảnh mỗi 6 giây), không có sân khấu và ghế như các phòng khác. Chat, hàng chờ, chấm điểm và hát chung vẫn dùng bình thường.
+- Danh sách ảnh nằm trong `public/dao/index.json`. Bản mặc định là 3 hình hoa đào vẽ bằng SVG. Muốn đổi, chép ảnh vào `public/dao/` rồi ghi tên file vào `index.json`.
+- Chỉ dùng ảnh bạn có quyền sử dụng, và nếu có người trong ảnh thì họ phải đã đồng ý và đủ 18 tuổi.
+
 ## Chọn ghế, hát chung, bài đã lưu
 - Bấm vào ghế trống để chuyển chỗ ngồi. Ghế của người đã thoát tự được giải phóng.
 - Người xem bấm Xin hát chung, người đang hát bấm Cho hát hoặc Từ chối. Tối đa 3 người hát chung, ai được duyệt thì được mở mic và cùng nhận điểm.
@@ -22,6 +27,8 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Giọng người hát đi qua chuỗi xử lý kiểu dàn karaoke: cổng lọc ồn, cắt tiếng ù, EQ (ấm, bớt đục, rõ lời, sáng), nén, vang hội trường, echo, chorus và giới hạn đỉnh.
 - Có 3 kiểu nhanh: Tiệm karaoke, Phòng thu, Hội trường. Vang và echo chỉnh được từ 0 đến 100%.
 - Khi hát có thanh đo mức tiếng và thanh Độ nhạy mic (mặc định x3). Thanh đo không nhảy nghĩa là mic chưa nhận được tiếng.
+- Mic tai nghe thường nhỏ và chập chờn: ô Mic cho chọn mic của máy thay cho mic tai nghe. Bộ tự cân mức khuếch đại tối đa 40 lần (mặc định 30), tăng mượt trong khoảng 1,5 giây, và giảm nhanh khi sắp vỡ tiếng.
+- Giảm ồn nền tự thích nghi theo mức ồn của từng mic, mặc định tắt. Khử vọng mặc định bật.
 - Mic tự cân mức: giữ giọng ở mức vừa phải, hạ nhanh khi sắp vỡ tiếng. Thanh Mic tối đa là mức khuếch đại cao nhất cho phép.
 - Kiểu Rõ lời, Tiệm karaoke, Hội trường: vang và echo càng nhiều thì lời càng dễ bị nhòe, bài hát nhanh nên dùng Rõ lời.
 - Người nghe có thể kéo thanh Giọng hát đến 300% nếu nghe nhỏ; trên 100% âm thanh đi qua Web Audio.

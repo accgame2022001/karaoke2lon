@@ -1,10 +1,12 @@
 "use client";
 import { Component, useEffect, useRef, useState } from "react";
 import { Room, RoomEvent, Track, LocalAudioTrack } from "livekit-client";
-import { startVoice, unlockAudio, getCtx } from "../lib/voice";
+import { startVoice, unlockAudio, getCtx, listMics } from "../lib/voice";
 
 const api = (p, body) =>
-  fetch(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+  fetch(p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then((r) => r.json())
+    .catch(() => ({ error: "Lỗi mạng, hãy thử lại" }));
 const ytId = (s) => (s.match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/) || (/^[\w-]{11}$/.test(s) ? [0, s] : []))[1];
 const cleanRoom = (s) => s.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 32) || "phong-1";
 const MAX = 30;
@@ -34,7 +36,7 @@ class Boundary extends Component {
     );
   }
 }
-const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: true, gate: true, gain: 6, plain: false };
+const FX0 = { filter: true, reverb: 28, echo: 14, monitor: true, ear: false, gate: false, gain: 30, plain: false, dev: "" };
 const PRESETS = [
   { n: "Rõ lời", reverb: 10, echo: 0 },
   { n: "Ca sĩ", reverb: 28, echo: 14 },
@@ -46,6 +48,7 @@ const ROOMS = [
   { id: "vip-1", name: "Phòng VIP 1", sub: "Đỏ neon sôi động", t: "neon" },
   { id: "vip-2", name: "Phòng VIP 2", sub: "Xanh đại dương", t: "ocean" },
   { id: "vip-3", name: "Phòng VIP 3", sub: "Xanh rừng ấm áp", t: "forest" },
+  { id: "phong-dao", name: "Phòng Đào", sub: "Hồng đào ngọt ngào, chỉ có hình ảnh", t: "peach" },
 ];
 const hue = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
 
@@ -94,7 +97,7 @@ export default function Page() {
   };
   return (
     <main className="join">
-      <h1>Karaoke cùng nhau</h1>
+      <h1>5 Sao Plus</h1>
       <input type="text" placeholder="Tên của bạn" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="rooms">
         {ROOMS.map((r) => (
@@ -108,6 +111,26 @@ export default function Page() {
         <button type="submit">Vào</button>
       </form>
     </main>
+  );
+}
+
+// Phòng Đào chỉ trình chiếu hình ảnh, danh sách ảnh nằm trong public/dao/index.json
+function Gallery({ who }) {
+  const [imgs, setImgs] = useState([]);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    fetch("/dao/index.json").then((r) => r.json()).then((d) => setImgs(Array.isArray(d.images) ? d.images : [])).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (imgs.length < 2) return;
+    const t = setInterval(() => setI((x) => (x + 1) % imgs.length), 6000);
+    return () => clearInterval(t);
+  }, [imgs.length]);
+  return (
+    <section className="gallery">
+      {imgs.map((src, k) => <img key={src} src={"/dao/" + src} alt="" className={k === i ? "on" : ""} />)}
+      <div className="cap">{who ? who + " đang hát" : "Chọn bài để bắt đầu"}</div>
+    </section>
   );
 }
 
@@ -144,17 +167,18 @@ function Karaoke({ name, room }) {
   const [canPlay, setCanPlay] = useState(true);
   const [speaking, setSpeaking] = useState(new Set());
   const [tk, setTk] = useState(0);
+  const [mics, setMics] = useState([]);
   // Bài đã lưu nằm trên trình duyệt này (localStorage), không đồng bộ giữa các thiết bị
   const [saved, setSaved] = useState(() => { try { return JSON.parse(localStorage.getItem("ksaved")) || []; } catch { return []; } });
   // Lọc tiếng và nghe lại giọng mình: mặc định bật, nhớ lựa chọn trên máy này
   const [fx, setFx] = useState(() => {
-    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx4")) }; } catch { return FX0; }
+    try { return { ...FX0, ...JSON.parse(localStorage.getItem("kfx5")) }; } catch { return FX0; }
   });
   const fxRef = useRef(fx);
   fxRef.current = fx;
   useEffect(() => {
     voice.current?.set(fx);
-    try { localStorage.setItem("kfx4", JSON.stringify(fx)); } catch {}
+    try { localStorage.setItem("kfx5", JSON.stringify(fx)); } catch {}
   }, [fx]);
   const toggleSave = (vid, title) => setSaved((s) => {
     const n = s.some((x) => x.vid === vid) ? s.filter((x) => x.vid !== vid) : [{ vid, title }, ...s].slice(0, 50);
@@ -316,7 +340,7 @@ function Karaoke({ name, room }) {
       const plain = fxRef.current.plain;
       usingPlain.current = plain;
       if (plain) {
-        await lp.setMicrophoneEnabled(true, { echoCancellation: !fxRef.current.ear, noiseSuppression: false, autoGainControl: true }, { dtx: false });
+        await lp.setMicrophoneEnabled(true, { echoCancellation: !fxRef.current.ear, noiseSuppression: false, autoGainControl: true, deviceId: fxRef.current.dev || undefined }, { dtx: false });
       } else {
         const v = await startVoice(fxRef.current);
         if (!micRef.current) { v.stop(); setMicState("off"); return; }
@@ -345,7 +369,7 @@ function Karaoke({ name, room }) {
     if (!pub?.track || pub.isMuted || !mt || mt.readyState !== "live") return false;
     if (usingPlain.current !== fxRef.current.plain) return false; // đổi chế độ mic thường / hiệu ứng
     const v = voice.current;
-    if (v && (!v.alive() || v.ear !== fxRef.current.ear)) return false;
+    if (v && (!v.alive() || v.ear !== fxRef.current.ear || v.dev !== (fxRef.current.dev || ""))) return false;
     return true;
   };
   useEffect(() => {
@@ -364,6 +388,14 @@ function Karaoke({ name, room }) {
     const iv = setInterval(tick, 1500);
     return () => { live = false; clearInterval(iv); };
   }, [mic]);
+
+  // Danh sách mic để chọn (tên mic chỉ hiện sau khi đã cấp quyền). Cắm hoặc rút tai nghe thì cập nhật lại.
+  useEffect(() => {
+    const load = () => listMics().then((d) => setMics(d.map((x) => ({ id: x.deviceId, label: x.label })))).catch(() => {});
+    if (mic) load();
+    navigator.mediaDevices?.addEventListener?.("devicechange", load);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", load);
+  }, [mic, micState]);
 
   // Thanh đo mức tiếng của mic để người hát biết mic có nhận được giọng hay không
   const meterRef = useRef(null);
@@ -528,7 +560,8 @@ function Karaoke({ name, room }) {
           <div className="meter"><i ref={meterRef} /></div>
           {quiet && <small className="err">Mic đang rất nhỏ hoặc chưa có tiếng. Nếu bạn đang hát mà thanh trên không nhảy, hãy tăng Độ nhạy mic và kiểm tra quyền mic của trình duyệt.</small>}
           <label className="row"><input type="checkbox" checked={fx.plain} onChange={(e) => setFx({ ...fx, plain: e.target.checked })} /> Mic thường (ổn định nhất, không hiệu ứng, không nghe lại)</label>
-          <label className="row">Mic tối đa <input type="range" min="1" max="10" step="0.5" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
+          <label className="row">Mic <select value={fx.dev} onChange={(e) => setFx({ ...fx, dev: e.target.value })}><option value="">Mặc định</option>{mics.map((m, i) => <option key={m.id || i} value={m.id}>{m.label || "Mic " + (i + 1)}</option>)}</select></label>
+          <label className="row">Độ nhạy tối đa <input type="range" min="1" max="40" step="1" value={fx.gain} onChange={(e) => setFx({ ...fx, gain: +e.target.value })} /> x{fx.gain}</label>
           <div className="presets">
             {PRESETS.map((p) => (
               <button key={p.n} className={fx.filter && fx.reverb === p.reverb && fx.echo === p.echo ? "" : "alt"} onClick={() => setFx({ ...fx, filter: true, reverb: p.reverb, echo: p.echo })}>{p.n}</button>
@@ -538,9 +571,9 @@ function Karaoke({ name, room }) {
           <label className="row">Vang <input type="range" min="0" max="100" value={fx.reverb} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, reverb: +e.target.value })} /> {fx.reverb}%</label>
           <label className="row">Echo <input type="range" min="0" max="100" value={fx.echo} disabled={!fx.filter} onChange={(e) => setFx({ ...fx, echo: +e.target.value })} /> {fx.echo}%</label>
           <label className="row"><input type="checkbox" checked={fx.gate} onChange={(e) => setFx({ ...fx, gate: e.target.checked })} /> Giảm ồn nền (có thể làm nhỏ tiếng khi hát khẽ)</label>
-          <label className="row"><input type="checkbox" checked={fx.ear} onChange={(e) => setFx({ ...fx, ear: e.target.checked })} /> Tôi đang đeo tai nghe (giọng tự nhiên hơn)</label>
+          <label className="row"><input type="checkbox" checked={fx.ear} onChange={(e) => setFx({ ...fx, ear: e.target.checked })} /> Tắt khử vọng (chỉ khi đeo tai nghe, giọng tự nhiên hơn)</label>
           <label className="row"><input type="checkbox" checked={fx.monitor} onChange={(e) => setFx({ ...fx, monitor: e.target.checked })} /> Nghe lại giọng mình</label>
-          <small>Mặc định giả định bạn đeo tai nghe. Hát bằng loa ngoài thì bỏ tick "đeo tai nghe" và tắt "nghe lại", nếu không sẽ bị hú. Hát nhanh thì chọn kiểu "Rõ lời".</small>
+          <small>Mic của tai nghe thường nhỏ và hay chập chờn, hãy thử chọn mic của máy ở ô Mic. Hát bằng loa ngoài thì tắt "nghe lại" để khỏi bị hú. Hát nhanh thì chọn kiểu "Rõ lời".</small>
         </section>
       )}
       {singing && (st.ask || []).length > 0 && (
@@ -556,6 +589,7 @@ function Karaoke({ name, room }) {
           </ul>
         </section>
       )}
+      {theme === "peach" ? <Gallery who={onStage.map((p) => p.name).join(" & ")} /> : (
       <section className="hall">
         <div className="stage">
           {onStage.length ? (
@@ -581,6 +615,7 @@ function Karaoke({ name, room }) {
           })}
         </div>
       </section>
+      )}
       <form className="chat" onSubmit={sendChat}>
         <input type="text" maxLength={120} placeholder="Nói gì với cả phòng…" value={msg} onChange={(e) => setMsg(e.target.value)} />
         <button type="submit">Gửi</button>
