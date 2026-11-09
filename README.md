@@ -14,8 +14,12 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Gõ tên bài vào ô Chọn bài để tìm karaoke. Cần `YOUTUBE_API_KEY`; hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày, kết quả được lưu 1 ngày để tiết kiệm.
 
 ## Phòng Đào
-- Phòng này chỉ có ghế, người trong phòng và chat, không có YouTube, nhạc, hàng chờ, bài đã lưu, chấm điểm hay bảng xếp hạng. Đầu phòng có dòng chữ lớn, sửa trong `app/page.js` (tìm chữ `banner`).
-- Máy chủ từ chối thêm bài vào phòng này.
+- Nền phòng là ảnh `public/bg/phong-dao.jpg`. Muốn đổi nền, thay file này bằng ảnh khác cùng tên.
+- Có màn hình sân khấu trình chiếu ảnh trong thư mục `public/dao`. Kéo ngang để lướt ảnh (có đà và lực cản ở hai đầu), hoặc bấm mũi tên và chấm bên dưới. Ảnh tự chuyển sau 6 giây.
+- Danh sách ảnh tự được quét từ `public/dao` mỗi lần chạy `npm run dev` và `npm run build` (Vercel cũng chạy lệnh này), nên chỉ cần chép ảnh vào thư mục rồi push. Hỗ trợ jpg, png, webp, gif, avif, svg (không hỗ trợ HEIC). Ảnh xếp theo tên file, có tính số (anh2 trước anh10).
+- Nên nén ảnh dưới khoảng 500 KB mỗi ảnh để lướt mượt trên điện thoại.
+- Chỉ dùng ảnh bạn có quyền sử dụng, và nếu có người trong ảnh thì họ phải đã đồng ý và đủ 18 tuổi.
+- Phòng không có YouTube, nhạc, hàng chờ, bài đã lưu, chấm điểm hay bảng xếp hạng. Máy chủ từ chối thêm bài vào phòng này. Dòng chữ lớn ở đầu phòng sửa trong `app/page.js` (tìm chữ `banner`).
 
 ## Chọn ghế, hát chung, bài đã lưu
 - Bấm vào ghế trống để chuyển chỗ ngồi. Ghế của người đã thoát tự được giải phóng.

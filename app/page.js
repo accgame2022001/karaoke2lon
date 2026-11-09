@@ -114,6 +114,83 @@ export default function Page() {
   );
 }
 
+// Màn hình sân khấu phòng Đào: kéo ngang để lướt ảnh (có đà và lực cản ở hai đầu), tự chuyển ảnh mỗi 6 giây
+function Screen() {
+  const [imgs, setImgs] = useState(null);
+  const [i, setI] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const box = useRef(null), track = useRef(null), g = useRef({});
+  useEffect(() => {
+    fetch("/dao/index.json", { cache: "no-store" }).then((r) => r.json()).then((d) => setImgs(Array.isArray(d.images) ? d.images : [])).catch(() => setImgs([]));
+  }, []);
+  const n = imgs?.length || 0;
+  const place = (ms) => {
+    const t = track.current;
+    if (!t) return;
+    t.style.transition = `transform ${ms}ms cubic-bezier(.22,.8,.3,1)`;
+    t.style.transform = `translate3d(${-i * 100}%,0,0)`;
+  };
+  useEffect(() => place(500), [i, n]);
+  useEffect(() => {
+    if (n < 2 || drag) return;
+    const t = setTimeout(() => setI((x) => (x + 1) % n), 6000);
+    return () => clearTimeout(t);
+  }, [n, i, drag]);
+  const go = (k) => setI(Math.max(0, Math.min(n - 1, k)));
+  const down = (e) => {
+    if (n < 2) return;
+    g.current = { x: e.clientX, last: e.clientX, t: performance.now(), v: 0, d: 0 };
+    setDrag(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    track.current.style.transition = "none";
+  };
+  const move = (e) => {
+    if (!drag) return;
+    const s = g.current, now = performance.now();
+    let d = e.clientX - s.x;
+    if ((i === 0 && d > 0) || (i === n - 1 && d < 0)) d *= 0.35; // kéo quá đầu hoặc cuối thì có lực cản
+    s.v = (e.clientX - s.last) / Math.max(1, now - s.t);
+    s.last = e.clientX; s.t = now; s.d = d;
+    track.current.style.transform = `translate3d(calc(${-i * 100}% + ${d}px),0,0)`; // theo sát ngón tay, không render lại
+  };
+  const up = () => {
+    if (!drag) return;
+    const w = box.current.clientWidth, { d, v } = g.current;
+    setDrag(false);
+    let k = i;
+    if (d < -w * 0.15 || v < -0.4) k = i + 1; // kéo đủ xa hoặc hất nhanh thì sang ảnh kế
+    else if (d > w * 0.15 || v > 0.4) k = i - 1;
+    k = Math.max(0, Math.min(n - 1, k));
+    if (k === i) place(350);
+    else setI(k);
+  };
+  const stop = (e) => e.stopPropagation();
+  const ref = (src) => "/dao/" + src.split("/").map(encodeURIComponent).join("/");
+  return (
+    <div className="screen" ref={box} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+      <div className="track" ref={track}>
+        {(imgs || []).map((src, k) => (
+          <div className="slide" key={src}>
+            <img src={ref(src)} alt="" draggable={false} loading={k < 2 ? "eager" : "lazy"} decoding="async" />
+          </div>
+        ))}
+      </div>
+      {imgs && n === 0 && <div className="empty">Chưa có ảnh nào trong thư mục public/dao</div>}
+      {n > 1 && (
+        <>
+          <button className="nav prev" aria-label="Ảnh trước" onPointerDown={stop} onClick={() => go(i - 1)}>‹</button>
+          <button className="nav next" aria-label="Ảnh sau" onPointerDown={stop} onClick={() => go(i + 1)}>›</button>
+          {n <= 12 ? (
+            <div className="dots" onPointerDown={stop}>{imgs.map((_, k) => <i key={k} className={k === i ? "on" : ""} onClick={() => go(k)} />)}</div>
+          ) : (
+            <div className="dots count">{i + 1} / {n}</div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function Song({ s, saved, onSave, children }) {
   const on = saved.some((x) => x.vid === s.vid);
   return (
@@ -522,6 +599,7 @@ function Karaoke({ name, room }) {
         <header><b>{info.name}</b><span>{people.length}/{MAX} ghế</span><button onClick={() => (location.href = "/")}>Rời phòng</button></header>
         <h2 className="banner">Phòng Đào thay đồ, dâm tặc chớ vào</h2>
         <section className="hall">
+          <Screen />
           <div className="seats">
             {seats.map((p, i) => (
               <div className={"sc" + (p ? "" : " free") + (p?.id === id ? " me" : "")} key={i} title={p ? "" : "Ngồi vào ghế này"} onClick={() => !p && sit(i)}>

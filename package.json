@@ -1,7 +1,11 @@
 {
   "name": "karaoke-room",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
+  "scripts": {
+    "dev": "node scripts/dao-list.mjs && next dev",
+    "build": "node scripts/dao-list.mjs && next build",
+    "start": "next start"
+  },
   "dependencies": {
     "next": "^15.5.0",
     "react": "^19.0.0",

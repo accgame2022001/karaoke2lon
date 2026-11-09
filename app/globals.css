@@ -73,3 +73,19 @@ body[data-t=peach]{--bg:#2a1218;--panel:#3a1a24;--line:#6b2f44;--hot:#ff9aa8;--o
 .card:last-child:nth-child(odd){grid-column:1/-1}
 select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:.4rem;flex:1;min-width:0}
 .banner{text-align:center;font-size:1.9rem;line-height:1.25;font-weight:800;color:var(--hot);margin:.4rem 0;text-shadow:0 0 18px #ff9aa855}
+body[data-t=peach]::before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(#12060c55,#12060cb0),url(/bg/phong-dao.jpg) center/cover no-repeat}
+body[data-t=peach] .hall{background:#12060c88;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);border-color:#ff9aa855}
+.screen{position:relative;overflow:hidden;aspect-ratio:4/5;max-height:72vh;margin:0 auto 1rem;border-radius:14px;border:3px solid var(--hot);box-shadow:0 0 26px #ff9aa866,inset 0 0 30px #0008;background:#000;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab}
+.screen:active{cursor:grabbing}
+.track{display:flex;height:100%;will-change:transform}
+.slide{flex:0 0 100%;height:100%}
+.slide img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
+.screen .nav{position:absolute;top:50%;transform:translateY(-50%);width:2.4rem;height:2.4rem;padding:0;border-radius:50%;background:#000a;color:#fff;font-size:1.6rem;line-height:1}
+.screen .prev{left:.5rem}
+.screen .next{right:.5rem}
+.dots{position:absolute;bottom:.6rem;left:0;right:0;display:flex;justify-content:center;gap:.4rem}
+.dots i{width:7px;height:7px;border-radius:50%;background:#fff5;cursor:pointer;transition:.3s}
+.dots i.on{background:#fff;transform:scale(1.35)}
+.dots.count{color:#fff;font-size:.8rem;text-shadow:0 1px 3px #000}
+.screen .empty{position:absolute;inset:0;display:grid;place-items:center;padding:1rem;text-align:center;color:var(--dim)}
+body[data-t=peach] header{color:#fff;text-shadow:0 1px 4px #000}
