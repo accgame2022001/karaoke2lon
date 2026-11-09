@@ -71,8 +71,5 @@ button.alt{background:transparent;color:var(--hot);border:1px solid var(--hot)}
 body[data-t=peach]{--bg:#2a1218;--panel:#3a1a24;--line:#6b2f44;--hot:#ff9aa8;--on:#ffd0d8;--chair:#c2456a;--spot:radial-gradient(ellipse at top,#ff9aa866,transparent 70%)}
 .card[data-t=peach]{--cb:#3a1a24;--cc:#ff9aa8}
 .card:last-child:nth-child(odd){grid-column:1/-1}
-.gallery{position:relative;aspect-ratio:4/5;border-radius:14px;overflow:hidden;background:var(--panel);border:1px solid var(--line)}
-.gallery img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s}
-.gallery img.on{opacity:1}
-.gallery .cap{position:absolute;left:0;right:0;bottom:0;padding:1.4rem .9rem .8rem;background:linear-gradient(transparent,#000b);color:#fff;font-weight:600}
 select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:.4rem;flex:1;min-width:0}
+.banner{text-align:center;font-size:1.9rem;line-height:1.25;font-weight:800;color:var(--hot);margin:.4rem 0;text-shadow:0 0 18px #ff9aa855}

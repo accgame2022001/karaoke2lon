@@ -48,7 +48,7 @@ const ROOMS = [
   { id: "vip-1", name: "Phòng VIP 1", sub: "Đỏ neon sôi động", t: "neon" },
   { id: "vip-2", name: "Phòng VIP 2", sub: "Xanh đại dương", t: "ocean" },
   { id: "vip-3", name: "Phòng VIP 3", sub: "Xanh rừng ấm áp", t: "forest" },
-  { id: "phong-dao", name: "Phòng Đào", sub: "Hồng đào ngọt ngào, chỉ có hình ảnh", t: "peach" },
+  { id: "phong-dao", name: "Phòng Đào", sub: "Chỉ trò chuyện, không có nhạc", t: "peach" },
 ];
 const hue = (s) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
 
@@ -111,26 +111,6 @@ export default function Page() {
         <button type="submit">Vào</button>
       </form>
     </main>
-  );
-}
-
-// Phòng Đào chỉ trình chiếu hình ảnh, danh sách ảnh nằm trong public/dao/index.json
-function Gallery({ who }) {
-  const [imgs, setImgs] = useState([]);
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    fetch("/dao/index.json").then((r) => r.json()).then((d) => setImgs(Array.isArray(d.images) ? d.images : [])).catch(() => {});
-  }, []);
-  useEffect(() => {
-    if (imgs.length < 2) return;
-    const t = setInterval(() => setI((x) => (x + 1) % imgs.length), 6000);
-    return () => clearInterval(t);
-  }, [imgs.length]);
-  return (
-    <section className="gallery">
-      {imgs.map((src, k) => <img key={src} src={"/dao/" + src} alt="" className={k === i ? "on" : ""} />)}
-    
-    </section>
   );
 }
 
@@ -223,7 +203,8 @@ function Karaoke({ name, room }) {
   const stRef = useRef(st);
   stRef.current = st;
   peopleRef.current = people;
-  const cur = st?.cur;
+  const peach = ROOMS.find((r) => r.id === room)?.t === "peach"; // phòng chỉ có ghế và trò chuyện
+  const cur = peach ? null : st?.cur;
   const singing = cur?.by === id;
   const duo = cur?.duo || [];
   const inDuo = duo.some((d) => d.id === id);
@@ -415,6 +396,7 @@ function Karaoke({ name, room }) {
 
   // 3) Phát YouTube đồng bộ theo mốc thời gian t0 của máy chủ
   useEffect(() => {
+    if (peach) return; // phòng Đào không tải YouTube
     loadYT().then(() => {
       if (yt.current) return;
       yt.current = new window.YT.Player("yt", {
@@ -452,7 +434,7 @@ function Karaoke({ name, room }) {
   }, [cur?.t0, cur?.vid]);
 
   // Chấm điểm: đếm ngược theo giờ máy chủ, hết giờ thì mỗi máy (lệch ngẫu nhiên) báo "finalize", chỉ lần đầu có tác dụng
-  const rate = st.rate;
+  const rate = peach ? null : st.rate;
   useEffect(() => {
     if (!rate) return;
     setNow(Date.now());
@@ -534,6 +516,32 @@ function Karaoke({ name, room }) {
       .catch((x) => setErr(String(x.message || x)));
   };
 
+  if (peach) {
+    return (
+      <main className="app">
+        <header><b>{info.name}</b><span>{people.length}/{MAX} ghế</span><button onClick={() => (location.href = "/")}>Rời phòng</button></header>
+        <h2 className="banner">Phòng Đào thay đồ, dâm tặc chớ vào</h2>
+        <section className="hall">
+          <div className="seats">
+            {seats.map((p, i) => (
+              <div className={"sc" + (p ? "" : " free") + (p?.id === id ? " me" : "")} key={i} title={p ? "" : "Ngồi vào ghế này"} onClick={() => !p && sit(i)}>
+                {p ? <Person p={p} text={bub[p.id]} /> : <div className="pp" />}
+                <div className="chair" />
+                <small>{p ? p.name : ""}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+        <form className="chat" onSubmit={sendChat}>
+          <input type="text" maxLength={120} placeholder="Nói gì với cả phòng…" value={msg} onChange={(e) => setMsg(e.target.value)} />
+          <button type="submit">Gửi</button>
+        </form>
+        {log.length > 0 && <div className="log">{log.map((l, i) => <div key={i}><b>{l.who}:</b> {l.text}</div>)}</div>}
+        {err && <p className="err">{err}</p>}
+      </main>
+    );
+  }
+
   return (
     <main className="app">
       <header><b>{info?.name || "Phòng " + room}</b><span>{people.length}/{MAX} ghế</span><button onClick={() => (location.href = "/")}>Rời phòng</button></header>
@@ -550,7 +558,7 @@ function Karaoke({ name, room }) {
             {!mic && !(st.ask || []).some((x) => x.id === id) && duo.length < 3 && <button onClick={() => duoAct("duo_ask")}>Xin hát chung</button>}
           </>
         ) : (
-          <h2>Phòng Đào thay đồ, dâm tặc chớ vào</h2>
+          <h2>Chưa có bài nào. Chọn bài bên dưới để bắt đầu.</h2>
         )}
       </div>
       {mic && (
@@ -589,7 +597,6 @@ function Karaoke({ name, room }) {
           </ul>
         </section>
       )}
-      {theme === "peach" ? <Gallery who={onStage.map((p) => p.name).join(" & ")} /> : (
       <section className="hall">
         <div className="stage">
           {onStage.length ? (
@@ -615,7 +622,6 @@ function Karaoke({ name, room }) {
           })}
         </div>
       </section>
-      )}
       <form className="chat" onSubmit={sendChat}>
         <input type="text" maxLength={120} placeholder="Nói gì với cả phòng…" value={msg} onChange={(e) => setMsg(e.target.value)} />
         <button type="submit">Gửi</button>

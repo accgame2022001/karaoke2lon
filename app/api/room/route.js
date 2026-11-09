@@ -29,6 +29,7 @@ export async function POST(req) {
   }
 
   if (a === "add") {
+    if (room === "phong-dao") return bad("Phòng Đào không có nhạc");
     const vid = String(b.vid || "");
     if (!/^[\w-]{11}$/.test(vid)) return bad("Link YouTube không hợp lệ");
     let title = b.title;

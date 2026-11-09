@@ -14,9 +14,8 @@ Phòng karaoke online: chọn nhạc YouTube, cả phòng nghe đồng bộ, ch�
 - Gõ tên bài vào ô Chọn bài để tìm karaoke. Cần `YOUTUBE_API_KEY`; hạn mức miễn phí khoảng 100 lượt tìm mỗi ngày, kết quả được lưu 1 ngày để tiết kiệm.
 
 ## Phòng Đào
-- Phòng này chỉ trình chiếu hình ảnh (đổi ảnh mỗi 6 giây), không có sân khấu và ghế như các phòng khác. Chat, hàng chờ, chấm điểm và hát chung vẫn dùng bình thường.
-- Danh sách ảnh nằm trong `public/dao/index.json`. Bản mặc định là 3 hình hoa đào vẽ bằng SVG. Muốn đổi, chép ảnh vào `public/dao/` rồi ghi tên file vào `index.json`.
-- Chỉ dùng ảnh bạn có quyền sử dụng, và nếu có người trong ảnh thì họ phải đã đồng ý và đủ 18 tuổi.
+- Phòng này chỉ có ghế, người trong phòng và chat, không có YouTube, nhạc, hàng chờ, bài đã lưu, chấm điểm hay bảng xếp hạng. Đầu phòng có dòng chữ lớn, sửa trong `app/page.js` (tìm chữ `banner`).
+- Máy chủ từ chối thêm bài vào phòng này.
 
 ## Chọn ghế, hát chung, bài đã lưu
 - Bấm vào ghế trống để chuyển chỗ ngồi. Ghế của người đã thoát tự được giải phóng.
